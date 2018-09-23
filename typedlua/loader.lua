@@ -101,7 +101,15 @@ local function findfile (name, pname, dirsep)
   if type(path) ~= "string" then
     error("'package." .. pname .. "' must be a string")
   end
-  return package.searchpath(name, path, dirsep)
+  -- search regular lua files first
+  local fpath,lerr =  package.searchpath(name, path, dirsep)
+  if not fpath then
+    -- search for typedlua files
+    local tlpath = string.gsub(path..";", "[.]lua;", ".tl;")
+    local fpath,tlerr = package.searchpath(name,tlpath,dirsep)
+    return fpath, lerr..(tlerr or "")
+  end
+  return fpath, lerr
 end
 
 local function create_load (loadstring_func, default_chunkname)
@@ -189,10 +197,10 @@ local custom_dofile   = create_dofile  (function(...) return loadfile(...) end)
 
 local function custom_loader (name)
   local filename, err = findfile(name, "path")
+  --filename = name
   if filename == nil then
     return err
   end
-
   local ret
   ret, err = loadfile(filename)
   if ret then
