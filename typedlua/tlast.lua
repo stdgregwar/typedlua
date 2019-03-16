@@ -84,6 +84,12 @@ function tlast.namelist (pos, id, ...)
   return t
 end
 
+function tlast.idList(pos, id, ...)
+  local t = { tag = "IdList", pos = pos, ... }
+  table.insert(t, 1, id)
+  return t
+end
+
 -- explist : (number, expr, expr*) -> (explist)
 function tlast.explist (pos, expr, ...)
   local t = { tag = "ExpList", pos = pos, ... }
@@ -287,8 +293,10 @@ function tlast.exprString (pos, str)
 end
 
 -- exprFunction : (number, parlist, type|stat, stat?) -> (expr)
-function tlast.exprFunction (pos, parlist, rettype, stat)
-  return { tag = "Function", pos = pos, [1] = parlist, [2] = rettype, [3] = stat }
+function tlast.exprFunction (pos, typeParams ,parlist, rettype, stat)
+
+  --TODO add typeParams to the struct
+  return { tag = "Function", pos = pos, [1] = parlist, [2] = rettype, [3] = stat, typeParams = typeParams}
 end
 
 -- exprTable : (number, field*) -> (expr)

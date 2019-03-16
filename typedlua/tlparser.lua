@@ -215,14 +215,17 @@ local G = lpeg.P { "TypedLua";
              (tllexer.symb(":") * (lpeg.Cp() * tllexer.token(tllexer.Name, "Name") /
              tlast.exprString) *
                lpeg.Cc(true))^-1 /
-             tlast.funcName;
+    tlast.funcName;
+  TypeParams = tllexer.symb("<") *
+               lpeg.V("IdList") *
+               tllexer.symb(">");
   ParList = lpeg.Cp() * lpeg.V("NameList") * (tllexer.symb(",") * lpeg.V("TypedVarArg"))^-1 /
             tlast.parList2 +
             lpeg.Cp() * lpeg.V("TypedVarArg") / tlast.parList1 +
             lpeg.Cp() / tlast.parList0;
   TypedVarArg = lpeg.Cp() * tllexer.symb("...") * (tllexer.symb(":") * lpeg.V("Type"))^-1 /
                 tlast.identDots;
-  FuncBody = lpeg.Cp() * tllexer.symb("(") * lpeg.V("ParList") * tllexer.symb(")") *
+  FuncBody = lpeg.Cp() * lpeg.V("TypeParams")^-1 * tllexer.symb("(") * lpeg.V("ParList") * tllexer.symb(")") *
              (tllexer.symb(":") * lpeg.V("RetType"))^-1 *
              lpeg.V("Block") * tllexer.kw("end") / exprFunction;
   FuncStat = lpeg.Cp() * (tllexer.kw("const") * lpeg.Cc(true) + lpeg.Cc(false)) *
