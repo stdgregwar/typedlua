@@ -77,6 +77,10 @@ local tltype = require "typedlua.tltype"
 
 local tlast = {}
 
+function tlast.var(id, typeargs)
+  return {tag = "Id", pos = id.pos, [1] = id[1], typeargs=typeargs}
+end
+
 -- namelist : (number, ident, ident*) -> (namelist)
 function tlast.namelist (pos, id, ...)
   local t = { tag = "NameList", pos = pos, ... }
@@ -233,6 +237,12 @@ end
 function tlast.statLocalTypeDec (stat)
   stat.is_local = true
   return stat
+end
+
+-- TypeParlist
+
+function tlast.typeParList(pos, nameList)
+  return { tag = "TypeParList", pos = pos, names = nameList}
 end
 
 -- parlist

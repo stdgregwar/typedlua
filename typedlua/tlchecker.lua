@@ -1069,6 +1069,9 @@ local function check_call (env, exp)
     end
   end
   if tltype.isFunction(t) then
+    if exp1.tag == 'Id' and exp1.typeparams then
+      print("Generic var", exp1[1])
+    end
     check_arguments(env, var2name(env, exp1), t[1], inferred_type, exp.pos)
     set_type(exp, t[2])
   elseif tltype.isAny(t) then

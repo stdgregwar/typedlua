@@ -3,12 +3,12 @@
 
 --test that normal funcs still work
 local function placebo(arg : number) : number
+      return arg
 end
 
-local function array<U>(... : U)
-      local arr : {U} = {...}
-      return arr
+local function array<U>(... : U) : {U}
+      return {...}
 end
 
 -- create a number array
-local my_array = array<number>(1,2,3,4,5,6,7,8,9)
+local my_array = array<number>(1,2)

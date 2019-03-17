@@ -92,7 +92,7 @@ local G = lpeg.P { "TypedLua";
   TypeDecId = (tllexer.kw("const") * lpeg.V("Id") / tlast.setConst) +
               lpeg.V("Id");
   IdList = lpeg.Cp() * lpeg.V("TypeDecId") * (tllexer.symb(",") * lpeg.V("TypeDecId"))^0 /
-           tlast.namelist;
+    tlast.namelist;
   IdDec = lpeg.V("IdList") * tllexer.symb(":") *
           (lpeg.V("Type") + lpeg.V("MethodType")) / tltype.fieldlist;
   IdDecList = (lpeg.V("IdDec")^1 + lpeg.Cc(nil)) / tltype.Table;
@@ -105,7 +105,7 @@ local G = lpeg.P { "TypedLua";
   -- parser
   Chunk = lpeg.V("Block");
   StatList = (tllexer.symb(";") + lpeg.V("Stat"))^0;
-  Var = lpeg.V("Id");
+  Var = lpeg.V("Id") * (lpeg.V("TypeArgs"))^-1 / tlast.var;
   TypedId = lpeg.Cp() * tllexer.token(tllexer.Name, "Name") * (tllexer.symb(":") *
             lpeg.V("Type"))^-1 / tlast.ident;
   FunctionDef = tllexer.kw("function") * lpeg.V("FuncBody");
@@ -123,7 +123,9 @@ local G = lpeg.P { "TypedLua";
   NameList = lpeg.Cp() * lpeg.V("TypedId") * (tllexer.symb(",") * lpeg.V("TypedId"))^0 /
              tlast.namelist;
   ExpList = lpeg.Cp() * lpeg.V("Expr") * (tllexer.symb(",") * lpeg.V("Expr"))^0 /
-            tlast.explist;
+    tlast.explist;
+
+  TypeArgs = tllexer.symb("<") * lpeg.V("TupleType") * tllexer.symb(">");
   FuncArgs = tllexer.symb("(") *
              (lpeg.V("Expr") * (tllexer.symb(",") * lpeg.V("Expr"))^0)^-1 *
              tllexer.symb(")") +
@@ -216,9 +218,7 @@ local G = lpeg.P { "TypedLua";
              tlast.exprString) *
                lpeg.Cc(true))^-1 /
     tlast.funcName;
-  TypeParams = tllexer.symb("<") *
-               lpeg.V("IdList") *
-               tllexer.symb(">");
+  TypeParams = lpeg.Cp() * (tllexer.symb("<") * lpeg.V("IdList") * tllexer.symb(">"))^-1 / tlast.typeParList;
   ParList = lpeg.Cp() * lpeg.V("NameList") * (tllexer.symb(",") * lpeg.V("TypedVarArg"))^-1 /
             tlast.parList2 +
             lpeg.Cp() * lpeg.V("TypedVarArg") / tlast.parList1 +
