@@ -414,6 +414,15 @@ function tltype.isMethod (t)
   end
 end
 
+-- generic function types
+function tltype.GenericFunction(fundef, env_backup)
+  return {tag = "TGFunction", fundef = fundef, env_backup=env_backup}
+end
+
+function tltype.isGFunction(t)
+  return t.tag == "TGFunction"
+end
+
 -- table types
 
 -- Field : (boolean, type, type) -> (field)
@@ -1154,6 +1163,19 @@ local function dumptable(t)
   return "{" .. table.concat(out, ", ") .. "}"
 end
 
+
+local function parlistToType(parlist)
+  local l = {}
+  for i, par in ipairs(parlist) do
+    if par.tag == "Id" then
+      l[i] = par[2]
+    elseif par.tag == "Dots" then
+      l[i] = tltype.Vararg(par[1]) -- take parameter type
+    end
+  end
+  return tltype.Tuple(l)
+end
+
 -- type2str (type) -> (string)
 local function type2str (t, n)
   n = n or 0
@@ -1190,6 +1212,19 @@ local function type2str (t, n)
     return table.concat(l, " | ") .. nullable
   elseif tltype.isFunction(t) then
     return type2str(t[1], n-1) .. " -> " .. type2str(t[2], n-1)
+  elseif tltype.isGFunction(t) then
+    local typeParList = t.fundef.typeParams.names
+    local tpstr = ""
+    for _,name in ipairs(typeParList) do
+      tpstr = tpstr .. name[1] .. ","
+    end
+    tpstr = tpstr:sub(0,-2)
+
+    local parlist = t.fundef[1]
+    return string.format("<%s>%s -> %s",
+                         tpstr,
+                         type2str(parlistToType(parlist)),
+                         type2str(t.fundef[2], n-1))
   elseif tltype.isTable(t) then
     --if t.interface then return t.interface end
     local l = {}

@@ -24,7 +24,7 @@ local Number = tltype.Number()
 local String = tltype.String()
 local Integer = tltype.Integer(false)
 
-local check_block, check_stm, check_exp, check_var, check_var_exps, check_require
+local check_block, check_stm, check_exp, check_var, check_var_exps, check_require, check_localrec
 
 local acolor = {
   red     = "\27[31;1m",
@@ -149,6 +149,7 @@ end
 
 local function replace_names (env, t, pos, ignore)
   ignore = ignore or {}
+  local dont_name = env.dont_name or {}
   if tltype.isRecursive(t) then
     local link = ignore[t[1]]
     ignore[t[1]] = true
@@ -184,7 +185,9 @@ local function replace_names (env, t, pos, ignore)
   elseif tltype.isVariable(t) then
     if not ignore[t[1]] then
       local r = replace_names(env, get_interface(env, t[1], pos), pos, ignore)
-      r.name = t[1]
+      if not dont_name[t[1]] then
+        r.name = t[1]
+      end
       return r
     else
       return t
@@ -1035,6 +1038,40 @@ local function replace_self (env, t, tself)
   end
 end
 
+
+local function check_generic_function(env, id, gfunction, typeargs, pos)
+  local fundef, env_b = gfunction.fundef, gfunction.env_backup
+  local param_names = fundef.typeParams.names
+
+  local tmp_env = tlst.env_backup(env_b) -- do another copy of the env to avoid polluting
+
+  -- declare type aliases in the tmp env to define type parameters
+  -- check if type arg count is correct
+  if #typeargs ~= #param_names then
+    typeerror(env, "generic",
+              string.format("type argument count don't match (%d vs %d)",
+                            #typeargs,
+                            #param_names),
+              pos)
+    return Nil
+  end
+
+  for i, var in ipairs(param_names) do
+    tlst.set_interface(tmp_env, var[1], typeargs[i], true)
+    tlst.set_dont_name(tmp_env, var[1])
+  end
+
+  fundef = tlst.env_backup(fundef) --make a copy of fundef TODO use deepcopy directly 
+  --remove type params to simulate plain function
+  fundef.typeParams = tlast.namelist(fundef.pos)
+
+  -- create a dummy name for the function instance
+  local virtual_id = tlast.var(id)
+
+  check_localrec(tmp_env, virtual_id, fundef)
+  return get_type(virtual_id) -- return the deduced type of the function
+end
+
 local function check_call (env, exp)
   local exp1 = exp[1]
   local explist = {}
@@ -1047,6 +1084,13 @@ local function check_call (env, exp)
   local inferred_type = replace_self(env, arglist2type(explist), env.self)
   local bold_token = env.color and acolor.bold .. "'%s'" .. acolor.reset or "'%s'"
   local msg = "attempt to call %s of type " .. bold_token
+
+
+  -- if called value is a generic
+  if tltype.isGFunction(t) then
+    t = check_generic_function(env, exp1, t, exp1.typeargs)
+  end
+
   if tltype.isPrim(t) then
     if t[1] == "assert" then
       if fsets[1] then
@@ -1069,9 +1113,6 @@ local function check_call (env, exp)
     end
   end
   if tltype.isFunction(t) then
-    if exp1.tag == 'Id' and exp1.typeparams then
-      print("Generic var", exp1[1])
-    end
     check_arguments(env, var2name(env, exp1), t[1], inferred_type, exp.pos)
     set_type(exp, t[2])
   elseif tltype.isAny(t) then
@@ -1257,7 +1298,18 @@ local function check_local (env, idlist, explist)
   return false
 end
 
-local function check_localrec (env, id, exp)
+function check_localrec (env, id, exp)
+
+  -- is function generic ?
+  if exp.typeParams.names then
+    local gfunc = tltype.GenericFunction(exp, tlst.env_backup(env))
+    tlst.set_local(env, id)
+    set_type(id, gfunc)
+    return false
+  end
+
+  -- type non generic function immediately
+
   local idlist, ret_type, block = exp[1], replace_names(env, exp[2], exp.pos), exp[3]
   local infer_return = false
   if not block then
