@@ -1057,7 +1057,7 @@ local function check_generic_function(env, id, gfunction, typeargs, pos)
   end
 
   for i, var in ipairs(param_names) do
-    tlst.set_interface(tmp_env, var[1], typeargs[i], true)
+    tlst.set_interface(tmp_env, var[1], replace_names(env, typeargs[i]), true)
     tlst.set_dont_name(tmp_env, var[1])
   end
 
@@ -1069,7 +1069,7 @@ local function check_generic_function(env, id, gfunction, typeargs, pos)
   local virtual_id = tlast.var(id)
 
   check_localrec(tmp_env, virtual_id, fundef)
-  return get_type(virtual_id) -- return the deduced type of the function
+  return replace_names(tmp_env, get_type(virtual_id), fundef.pos) -- return the deduced type of the function
 end
 
 local function check_call (env, exp)
@@ -1389,7 +1389,8 @@ local function check_return (env, stm)
   check_explist(env, stm)
   local t = explist2typelist(stm)
   if not tltype.isVoid(t) then
-    tlst.set_return_type(env, tltype.general(t))
+    -- TODO check that replace_names here don't break things
+    tlst.set_return_type(env, replace_names(env,tltype.general(t), stm.pos))
   end
   return true
 end
