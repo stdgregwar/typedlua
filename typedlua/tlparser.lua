@@ -96,11 +96,12 @@ local G = lpeg.P { "TypedLua";
   IdDec = lpeg.V("IdList") * tllexer.symb(":") *
           (lpeg.V("Type") + lpeg.V("MethodType")) / tltype.fieldlist;
   IdDecList = (lpeg.V("IdDec")^1 + lpeg.Cc(nil)) / tltype.Table;
-  TypeDec = tllexer.token(tllexer.Name, "Name") * lpeg.V("IdDecList") * tllexer.kw("end");
+  TypeParams = lpeg.Cp() * (tllexer.symb("<") * lpeg.V("IdList") * tllexer.symb(">"))^-1 / tlast.typeParList;
+  TypeDec = tllexer.token(tllexer.Name, "Name") * lpeg.V("TypeParams")* lpeg.V("IdDecList") * tllexer.kw("end");
   Interface = lpeg.Cp() * tllexer.kw("interface") * lpeg.V("TypeDec") /
               tlast.statInterface +
               lpeg.Cp() * tllexer.kw("typealias") *
-              tllexer.token(tllexer.Name, "Name") * tllexer.symb("=") * lpeg.V("Type") /
+              tllexer.token(tllexer.Name, "Name") * lpeg.V("TypeParams") * tllexer.symb("=") * lpeg.V("Type") /
               tlast.statInterface;
   -- parser
   Chunk = lpeg.V("Block");
@@ -218,7 +219,6 @@ local G = lpeg.P { "TypedLua";
              tlast.exprString) *
                lpeg.Cc(true))^-1 /
     tlast.funcName;
-  TypeParams = lpeg.Cp() * (tllexer.symb("<") * lpeg.V("IdList") * tllexer.symb(">"))^-1 / tlast.typeParList;
   ParList = lpeg.Cp() * lpeg.V("NameList") * (tllexer.symb(",") * lpeg.V("TypedVarArg"))^-1 /
             tlast.parList2 +
             lpeg.Cp() * lpeg.V("TypedVarArg") / tlast.parList1 +

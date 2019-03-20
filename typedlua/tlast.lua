@@ -217,9 +217,9 @@ function tlast.statApply (expr)
 end
 
 -- statInterface : (number, string, type) -> (stat)
-function tlast.statInterface (pos, name, t)
+function tlast.statInterface (pos, name, typeParams, t)
   t.interface = name
-  return { tag = "Interface", pos = pos, [1] = name, [2] = t }
+  return { tag = "Interface", pos = pos, [1] = name, [2] = t, typeParams=typeParams}
 end
 
 -- statUserdata : (number, string, type) -> (stat)
