@@ -109,7 +109,9 @@ local G = lpeg.P { "TypedLua";
   Var = lpeg.V("Id") * (lpeg.V("TypeArgs"))^-1 / tlast.var;
   TypedId = lpeg.Cp() * tllexer.token(tllexer.Name, "Name") * (tllexer.symb(":") *
             lpeg.V("Type"))^-1 / tlast.ident;
-  FunctionDef = tllexer.kw("function") * lpeg.V("FuncBody");
+  FunctionDef = tllexer.kw("function") * lpeg.V("FuncBody") +
+    lpeg.Cp() * tllexer.symb("(") * lpeg.V("ParList") * tllexer.symb(")")
+    * tllexer.symb("->") * lpeg.V("ExpList") / tlast.exprLambda;
   FieldSep = tllexer.symb(",") + tllexer.symb(";");
   Field = lpeg.Cp() *
           ((tllexer.symb("[") * lpeg.V("Expr") * tllexer.symb("]")) +
@@ -216,7 +218,7 @@ local G = lpeg.P { "TypedLua";
   FuncName = lpeg.Cf(lpeg.V("Id") * (tllexer.symb(".") *
              (lpeg.Cp() * tllexer.token(tllexer.Name, "Name") / tlast.exprString))^0, tlast.funcName) *
              (tllexer.symb(":") * (lpeg.Cp() * tllexer.token(tllexer.Name, "Name") /
-             tlast.exprString) *
+            tlast.exprString) *
                lpeg.Cc(true))^-1 /
     tlast.funcName;
   ParList = lpeg.Cp() * lpeg.V("NameList") * (tllexer.symb(",") * lpeg.V("TypedVarArg"))^-1 /

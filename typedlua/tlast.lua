@@ -77,8 +77,8 @@ local tltype = require "typedlua.tltype"
 
 local tlast = {}
 
-function tlast.var(id, typeargs)
-  return {tag = "Id", pos = id.pos, [1] = id[1], typeargs=typeargs}
+function tlast.var(id, type_args)
+  return {tag = "Id", pos = id.pos, [1] = id[1], type_args=type_args}
 end
 
 -- namelist : (number, ident, ident*) -> (namelist)
@@ -217,9 +217,9 @@ function tlast.statApply (expr)
 end
 
 -- statInterface : (number, string, type) -> (stat)
-function tlast.statInterface (pos, name, typeParams, t)
+function tlast.statInterface (pos, name, type_params, t)
   t.interface = name
-  return { tag = "Interface", pos = pos, [1] = name, [2] = t, typeParams=typeParams}
+  return { tag = "Interface", pos = pos, [1] = name, [2] = t, type_params=type_params}
 end
 
 -- statUserdata : (number, string, type) -> (stat)
@@ -303,10 +303,20 @@ function tlast.exprString (pos, str)
 end
 
 -- exprFunction : (number, parlist, type|stat, stat?) -> (expr)
-function tlast.exprFunction (pos, typeParams ,parlist, rettype, stat)
+function tlast.exprFunction (pos, type_params ,parlist, rettype, stat)
+  return { tag = "Function", pos = pos, [1] = parlist, [2] = rettype, [3] = stat, type_params = type_params}
+end
 
-  --TODO add typeParams to the struct
-  return { tag = "Function", pos = pos, [1] = parlist, [2] = rettype, [3] = stat, typeParams = typeParams}
+-- exprLambda : (number, parlist, explist)
+function tlast.exprLambda(pos, parlist, explist)
+  local rpos = explist.pos
+  -- TODO give parametric type when params have no type
+  -- recreate a function expr :
+  return tlast.exprFunction(pos, nil, parlist,
+                            tlast.block(rpos,
+                                        tlast.statReturn(rpos, unpack(explist))
+                            )
+  )
 end
 
 -- exprTable : (number, field*) -> (expr)

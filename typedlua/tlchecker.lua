@@ -1088,7 +1088,7 @@ local function check_call (env, exp)
 
   -- if called value is a generic
   if tltype.isGFunction(t) then
-    t = check_generic_function(env, exp1, t, exp1.typeargs)
+    t = check_generic_function(env, exp1, t, exp1.type_args)
   end
 
   if tltype.isPrim(t) then
@@ -1301,7 +1301,7 @@ end
 function check_localrec (env, id, exp)
 
   -- is function generic ?
-  if exp.typeParams.names then
+  if exp.type_params.names then
     local gfunc = tltype.GenericFunction(exp, tlst.env_backup(env))
     tlst.set_local(env, id)
     set_type(id, gfunc)
@@ -1697,6 +1697,11 @@ local function check_id (env, exp)
   if not floc then -- upvalue, type is ubound of the var
     t = get_ubound(l)
   end
+  -- check for type arguments
+  if exp.type_args and #exp.type_args > 0 then
+    -- TODO check params and instantiate the actual type here
+  end
+
   set_type(exp, t)
   local l, floc, _ = tlst.get_local(env, name)
   if l and floc and not l.assigned then

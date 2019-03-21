@@ -415,8 +415,8 @@ function tltype.isMethod (t)
 end
 
 -- generic function types
-function tltype.GenericFunction(fundef, env_backup)
-  return {tag = "TGFunction", fundef = fundef, env_backup=env_backup}
+function tltype.GenericFunction(type_params, template_type)
+  return {tag = "TGFunction", type_params=type_params, template_type=template_type}
 end
 
 function tltype.isGFunction(t)
@@ -538,6 +538,15 @@ end
 -- isVariable : (type) -> (boolean)
 function tltype.isGlobalVariable (t)
   return t.tag == "TGlobalVariable"
+end
+
+-- Parameter types
+function tltype.Parameter(name, lower_bound, upper_bound)
+  return {tag = "TParameter", name = name, lower_bound=lower_bound, upper_bound=upper_bound}
+end
+
+function tltype.isParameter(t)
+  return t.tag == "TParameter"
 end
 
 -- recursive types
