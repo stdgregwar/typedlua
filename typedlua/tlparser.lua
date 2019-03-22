@@ -101,7 +101,7 @@ local G = lpeg.P { "TypedLua";
   Interface = lpeg.Cp() * tllexer.kw("interface") * lpeg.V("TypeDec") /
               tlast.statInterface +
               lpeg.Cp() * tllexer.kw("typealias") *
-              tllexer.token(tllexer.Name, "Name") * lpeg.V("TypeParams") * tllexer.symb("=") * lpeg.V("Type") /
+            tllexer.token(tllexer.Name, "Name") * lpeg.V("TypeParams") * tllexer.symb("=") * lpeg.V("Type") /
               tlast.statInterface;
   -- parser
   Chunk = lpeg.V("Block");

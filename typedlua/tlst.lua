@@ -31,29 +31,6 @@ function tlst.new_env (subject, filename, strict, color)
   return env
 end
 
-local function deepcopy(orig)
-  local orig_type = type(orig)
-  local copy
-  if orig_type == 'table' then
-    copy = {}
-    for orig_key, orig_value in next, orig, nil do
-      copy[deepcopy(orig_key)] = deepcopy(orig_value)
-    end
-    setmetatable(copy, deepcopy(getmetatable(orig)))
-  else -- number, string, boolean, etc
-    copy = orig
-  end
-  return copy
-end
-
-
--- do a deep copy of the env
-function tlst.env_backup(env)
-  local backup = deepcopy(env)
-  backup.messages = env.messages --keep same message channel
-  return backup
-end
-
 function tlst.set_dont_name(env, name)
   env.dont_name[name] = true
 end

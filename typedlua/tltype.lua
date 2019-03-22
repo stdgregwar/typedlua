@@ -414,13 +414,18 @@ function tltype.isMethod (t)
   end
 end
 
--- generic function types
-function tltype.GenericFunction(type_params, template_type)
-  return {tag = "TGFunction", type_params=type_params, template_type=template_type}
+-- generic types
+function tltype.Generic(type_params, template_type)
+  return {tag = "TGeneric", type_params=type_params, [1]=template_type}
 end
 
-function tltype.isGFunction(t)
-  return t.tag == "TGFunction"
+function tltype.isGeneric(t)
+  return t.tag == "TGeneric"
+end
+
+function tltype.isGenericFunction(t)
+  return tltype.isGeneric(t) and
+    tltype.isFunction(t[1])
 end
 
 -- table types
@@ -969,6 +974,14 @@ local function subtype_tuple (env, t1, t2, relation)
   end
 end
 
+local function subtype_parameter(env, t1, t2)
+  -- TODO take bounds into account
+  if tltype.isParameter(t1) and tltype.isParameter(t2) then
+    return t1.name == t2.name
+  end
+  return false
+end
+
 function subtype (env, t1, t2, relation)
   if tltype.isVoid(t1) and tltype.isVoid(t2) then
     return true
@@ -1019,6 +1032,7 @@ function subtype (env, t1, t2, relation)
            subtype_function(env, t1, t2, relation) or
            subtype_table(env, t1, t2, relation) or
            subtype_variable(env, t1, t2) or
+           subtype_parameter(env, t1, t2) or
            subtype_global_variable(env, t1, t2, relation) or
            subtype_recursive(env, t1, t2, relation)
   end
@@ -1221,19 +1235,20 @@ local function type2str (t, n)
     return table.concat(l, " | ") .. nullable
   elseif tltype.isFunction(t) then
     return type2str(t[1], n-1) .. " -> " .. type2str(t[2], n-1)
-  elseif tltype.isGFunction(t) then
-    local typeParList = t.fundef.typeParams.names
+  elseif tltype.isGeneric(t) then
+    local typeParList = t.type_params
     local tpstr = ""
     for _,name in ipairs(typeParList) do
       tpstr = tpstr .. name[1] .. ","
     end
     tpstr = tpstr:sub(0,-2)
 
-    local parlist = t.fundef[1]
-    return string.format("<%s>%s -> %s",
+    local inner_type = type2str(t[1], n-1)
+    return string.format("<%s>%s",
                          tpstr,
-                         type2str(parlistToType(parlist)),
-                         type2str(t.fundef[2], n-1))
+                         inner_type)
+  elseif tltype.isParameter(t) then
+    return t.name
   elseif tltype.isTable(t) then
     --if t.interface then return t.interface end
     local l = {}
@@ -1275,6 +1290,112 @@ end
 -- tostring : (type) -> (string)
 function tltype.tostring (t, n)
   return type2str(t, n)
+end
+
+-- generic type instance
+
+local function param_subst(t, sub)
+  if type(t) ~= 'table' then return t end
+  
+  if tltype.isParameter(t) then
+    if sub[t.name] then
+      return sub[t.name]
+    end
+  end
+
+  for i, st in ipairs(t) do
+    t[i] = param_subst(st, sub)
+  end
+  return t
+end
+
+local function deepcopy(orig)
+  local orig_type = type(orig)
+  local copy
+  if orig_type == 'table' then
+    copy = {}
+    for orig_key, orig_value in next, orig, nil do
+      copy[deepcopy(orig_key)] = deepcopy(orig_value)
+    end
+    setmetatable(copy, deepcopy(getmetatable(orig)))
+  else -- number, string, boolean, etc
+    copy = orig
+  end
+  return copy
+end
+
+function tltype.instanciate_generic(generic, args)
+  assert(#args == #generic.type_params, "param arity mismatch")
+  local subst = {}
+  local type_params = generic.type_params
+  for i, t in ipairs(args) do
+    subst[type_params[i][1]] = t
+  end
+  return param_subst(deepcopy(generic[1]), subst)
+end
+
+-- type inference
+
+function tltype.infer_params(env, type_params, ptype, given, pos)
+  local infered_subst = {}
+  local failed = false
+  local function infer_step(ptype, given)
+    if type(ptype) ~= 'table' or type(given) ~= 'table' then
+      if ptype ~= given then
+        failed = true
+      end
+      return
+    end
+    if tltype.isParameter(ptype) then
+      local name = ptype.name
+      local already = infered_subst[name]
+      if already then
+        -- is already infered type compatible ?
+        -- TODO take function case into consideration
+        if subtype(env, given, already) then
+          return
+        elseif subtype(env, already, given) then
+          infered_subst[name] = given
+          return
+        end
+        -- error, cannot concile types
+        tltype.typeerror(env, "inference", string.format(
+                           "cannot concile types %s and %s during inference of parameter %s",
+        type2str(already), type2str(given), name), pos)
+        failed = true
+      else
+        infered_subst[ptype.name] = given
+        return
+      end
+    elseif subtype(env,ptype, given) then
+      return
+    else
+      if type(ptype) == 'string' then
+        print("wut")
+      end
+      for i, pt in ipairs(ptype) do
+        infer_step(pt, given[i])
+      end
+    end
+  end
+
+  infer_step(ptype, given)
+  if failed then
+    return false
+  end
+
+  local types = {}
+  for i, id in ipairs(type_params) do --TODO check arity and definedness
+    local t = infered_subst[id[1]]
+    if not t then
+      tltype.typeerror(env, "inference", string.format(
+                         "not enough information to infer type variable %s", id[1]
+                                                      ),pos)
+      return nil
+    end
+    table.insert(types, t)
+  end
+  return tltype.Tuple(types)
 end
 
 function tltype.typeerror (env, tag, msg, pos)

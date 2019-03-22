@@ -43,6 +43,11 @@ local function set_ubound (var, t)
   var.ubound = t
 end
 
+local function bold_token(env, str)
+  local fmt = env.color and acolor.bold .. "'%s'" .. acolor.reset or "'%s'"
+  return string.format(fmt, str)
+end
+
 local function get_type (node)
   return node and tltype.unfold(node["type"]) or Nil
 end
@@ -1039,37 +1044,25 @@ local function replace_self (env, t, tself)
 end
 
 
-local function check_generic_function(env, id, gfunction, typeargs, pos)
-  local fundef, env_b = gfunction.fundef, gfunction.env_backup
-  local param_names = fundef.typeParams.names
+local function check_generic_function_def(env, id, fundef)
+  local param_names = fundef.type_params.names
 
-  local tmp_env = tlst.env_backup(env_b) -- do another copy of the env to avoid polluting
 
-  -- declare type aliases in the tmp env to define type parameters
-  -- check if type arg count is correct
-  if #typeargs ~= #param_names then
-    typeerror(env, "generic",
-              string.format("type argument count don't match (%d vs %d)",
-                            #typeargs,
-                            #param_names),
-              pos)
-    return Nil
-  end
+  --begin function scope
+  tlst.begin_scope(env)
 
   for i, var in ipairs(param_names) do
-    tlst.set_interface(tmp_env, var[1], replace_names(env, typeargs[i]), true)
-    tlst.set_dont_name(tmp_env, var[1])
+    -- TODO take bounds into account
+    tlst.set_interface(env, var[1], tltype.Parameter(var[1]), true)
+    -- tlst.set_dont_name(env, var[1])
   end
 
-  fundef = tlst.env_backup(fundef) --make a copy of fundef TODO use deepcopy directly 
-  --remove type params to simulate plain function
-  fundef.typeParams = tlast.namelist(fundef.pos)
-
   -- create a dummy name for the function instance
-  local virtual_id = tlast.var(id)
-
-  check_localrec(tmp_env, virtual_id, fundef)
-  return replace_names(tmp_env, get_type(virtual_id), fundef.pos) -- return the deduced type of the function
+  check_localrec(env, id, fundef, true)
+  tlst.end_scope(env)
+  tlst.set_local(env, id)
+  local deduced_type = get_type(id)
+  set_type(id, tltype.Generic(param_names,get_type(id)))
 end
 
 local function check_call (env, exp)
@@ -1086,9 +1079,16 @@ local function check_call (env, exp)
   local msg = "attempt to call %s of type " .. bold_token
 
 
-  -- if called value is a generic
-  if tltype.isGFunction(t) then
-    t = check_generic_function(env, exp1, t, exp1.type_args)
+  -- if called value is a generic function, try to infer types
+  if tltype.isGenericFunction(t) then
+    -- try to infer passed types
+    local gfunc = t[1]
+    local gargtuple = gfunc[1]
+    local infered_params = tltype.infer_params(env, t.type_params, gargtuple, inferred_type,exp1.pos)
+    if infered_params then
+      print(tltype.tostring(infered_params))
+      t = tltype.instanciate_generic(t, infered_params)
+    end
   end
 
   if tltype.isPrim(t) then
@@ -1298,13 +1298,11 @@ local function check_local (env, idlist, explist)
   return false
 end
 
-function check_localrec (env, id, exp)
+function check_localrec (env, id, exp, ignore_generic)
 
   -- is function generic ?
-  if exp.type_params.names then
-    local gfunc = tltype.GenericFunction(exp, tlst.env_backup(env))
-    tlst.set_local(env, id)
-    set_type(id, gfunc)
+  if exp.type_params.names and not ignore_generic then
+    check_generic_function_def(env, id, exp)
     return false
   end
 
@@ -1698,8 +1696,21 @@ local function check_id (env, exp)
     t = get_ubound(l)
   end
   -- check for type arguments
-  if exp.type_args and #exp.type_args > 0 then
-    -- TODO check params and instantiate the actual type here
+  local type_args = exp.type_args
+  if type_args and #type_args > 0 then
+    if not tltype.isGeneric(t) then
+      typeerror(env, "generic", string.format(
+                  "could not parametrize non-generic type %s",
+                  bold_token(env ,tltype.tostring(t)),
+                  bold_token), exp.pos)
+    elseif #type_args ~= #t.type_params then
+      typeerror(env, "generic", string.format(
+                  "type parameter arity mismatch (expected %d but got %d)",
+                  #t.type_params, #type_args), exp.pos)
+    end
+
+    -- enough arguments, instanciate
+    t = tltype.instanciate_generic(t, type_args)
   end
 
   set_type(exp, t)

@@ -65,6 +65,8 @@ type:
   | `TUnionlist{ type type type* }
   | `TTuple{ type type* }
   | `TVararg{ type }
+  | `TParameter{name}
+  | `TGeneric{type, parameters}
 
 literal: false | true | <number> | <string>
 
@@ -223,9 +225,9 @@ function tlast.statInterface (pos, name, type_params, t)
 end
 
 -- statUserdata : (number, string, type) -> (stat)
-function tlast.statUserdata (pos, name, t)
+function tlast.statUserdata (pos, name, type_params, t)
   t.userdata = name
-  return { tag = "Userdata", pos = pos, [1] = name, [2] = t }
+  return { tag = "Userdata", pos = pos, [1] = name, [2] = t, type_params=type_params}
 end
 
 -- statRequire : (number, string) -> (stat)
@@ -307,6 +309,7 @@ function tlast.exprFunction (pos, type_params ,parlist, rettype, stat)
   return { tag = "Function", pos = pos, [1] = parlist, [2] = rettype, [3] = stat, type_params = type_params}
 end
 
+local unpack = unpack or table.unpack
 -- exprLambda : (number, parlist, explist)
 function tlast.exprLambda(pos, parlist, explist)
   local rpos = explist.pos
