@@ -1052,8 +1052,7 @@ local function check_generic_function_def(env, id, fundef)
   tlst.begin_scope(env)
 
   for i, var in ipairs(param_names) do
-    -- TODO take bounds into account
-    tlst.set_interface(env, var[1], tltype.Parameter(var[1]), true)
+    tlst.set_interface(env, var[1], tltype.Parameter(var), true)
     -- tlst.set_dont_name(env, var[1])
   end
 

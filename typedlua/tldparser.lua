@@ -15,6 +15,7 @@ local G = lpeg.P { "TypedLuaDescription";
   TypedLuaDescription = tllexer.Skip * lpeg.V("DescriptionList") * -1 +
                         tllexer.report_error();
   -- type language
+  TopType = lpeg.V("GenericType") + lpeg.V("Type");
   Type = lpeg.V("NilableType");
   NilableType = lpeg.V("UnionType") * (tllexer.symb("?") * lpeg.Cc(true))^-1 /
                 tltype.UnionNil;
@@ -89,12 +90,16 @@ local G = lpeg.P { "TypedLuaDescription";
           (lpeg.V("Type") + lpeg.V("MethodType")) / tltype.fieldlist;
   IdDecList = (lpeg.V("IdDec")^1 + lpeg.Cc(nil)) / tltype.Table;
   TypeParams = lpeg.Cp() * (tllexer.symb("<") * lpeg.V("IdList") * tllexer.symb(">"))^-1 / tlast.typeParList;
+  MandatoryTypeParams = lpeg.Cp() * tllexer.symb("<") * lpeg.V("IdList") * tllexer.symb(">") / tlast.typeParList;
   TypeDec = tllexer.token(tllexer.Name, "Name") * lpeg.V("TypeParams")* lpeg.V("IdDecList") * tllexer.kw("end");
   Interface = lpeg.Cp() * tllexer.kw("interface") * lpeg.V("TypeDec") /
               tlast.statInterface +
               lpeg.Cp() * tllexer.kw("typealias") *
-              tllexer.token(tllexer.Name, "Name") * tllexer.symb("=") * lpeg.V("Type") /
-              tlast.statInterface;
+              tllexer.token(tllexer.Name, "Name") * lpeg.V("TypeParams") * tllexer.symb("=") * lpeg.V("Type") /
+    tlast.statInterface;
+
+  GenericType = lpeg.V("MandatoryTypeParams") * lpeg.V("Type") / tltype.makeGeneric;
+
   -- parser
   Require = lpeg.Cp() * tllexer.kw("require") * lpeg.V("RequireArgs") / tlast.statRequire;
   RequireArgs = tllexer.symb("(") * tllexer.token(tllexer.String, "String") * tllexer.symb(")") +
@@ -107,7 +112,7 @@ local G = lpeg.P { "TypedLuaDescription";
                     lpeg.V("Require") +
                     lpeg.V("Userdata");
   TypedId = lpeg.Cp() * tllexer.token(tllexer.Name, "Name") *
-            tllexer.symb(":") * lpeg.V("Type") / tlast.ident;
+            tllexer.symb(":") * lpeg.V("TopType") / tlast.ident;
 }
 
 local function traverse (ast, errorinfo, strict)

@@ -220,6 +220,9 @@ end
 
 -- statInterface : (number, string, type) -> (stat)
 function tlast.statInterface (pos, name, type_params, t)
+  if not t then
+    print("wut")
+  end
   t.interface = name
   return { tag = "Interface", pos = pos, [1] = name, [2] = t, type_params=type_params}
 end
@@ -243,7 +246,18 @@ end
 
 -- TypeParlist
 
+local uniquec = 0
+local function unique()
+  uniquec = uniquec + 1
+  return uniquec
+end
+
 function tlast.typeParList(pos, nameList)
+  if nameList then
+    for i, id in ipairs(nameList) do
+      id.id = unique()
+    end
+  end
   return { tag = "TypeParList", pos = pos, names = nameList}
 end
 

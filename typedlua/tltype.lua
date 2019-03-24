@@ -415,8 +415,36 @@ function tltype.isMethod (t)
 end
 
 -- generic types
+
+-- transform TVariable in TParameters
+local function variables_to_parameters(type_params, t)
+  local function subst(names, t)
+    if type(t) ~= 'table' then
+      return t
+    end
+    if tltype.isVariable(t) and names[t[1]] then
+      -- change variable into a Parameter
+      return tltype.Parameter(names[t[1]])
+    end
+    for i, ts in ipairs(t) do
+      t[i] = subst(names, ts)
+    end
+    return t
+  end
+
+  local names  = {}
+  for _, id in ipairs(type_params) do
+    names[id[1]] = id
+  end
+  return subst(names, t)
+end
+
 function tltype.Generic(type_params, template_type)
   return {tag = "TGeneric", type_params=type_params, [1]=template_type}
+end
+
+function tltype.makeGeneric(type_params, inner_type)
+  return tltype.Generic(type_params.names, variables_to_parameters(type_params.names, inner_type))
 end
 
 function tltype.isGeneric(t)
@@ -546,8 +574,8 @@ function tltype.isGlobalVariable (t)
 end
 
 -- Parameter types
-function tltype.Parameter(name, lower_bound, upper_bound)
-  return {tag = "TParameter", name = name, lower_bound=lower_bound, upper_bound=upper_bound}
+function tltype.Parameter(id)
+  return {tag = "TParameter", name = id[1], id = id.id}
 end
 
 function tltype.isParameter(t)
@@ -977,7 +1005,7 @@ end
 local function subtype_parameter(env, t1, t2)
   -- TODO take bounds into account
   if tltype.isParameter(t1) and tltype.isParameter(t2) then
-    return t1.name == t2.name
+    return t1.name == t2.name and t1.id == t2.id
   end
   return false
 end
@@ -1276,7 +1304,9 @@ local function type2str (t, n)
     for i = 1, #t-1 do
       l[i] = type2str(t[i], n-1)
     end
-    if not tltype.isNil(t[#t][1]) then
+    --if not tltype.isNil(t[#t][1]) then
+    
+    if tltype.isParameter(t[#t]) or not tltype.isNil(t[#t][1]) then
       l[#t] = type2str(t[#t], n-1)
     end
     return "(" .. table.concat(l, ", ") .. ")"

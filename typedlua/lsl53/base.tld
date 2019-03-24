@@ -10,7 +10,7 @@ dofile : (string?) -> (any*)
 error : $error
 _G : { string:any }
 getmetatable : (value) -> (any)
-ipairs : ({any}) -> (({any}, integer) -> (integer, any), {any}, integer)
+ipairs : <U>({U}) -> (({U}, integer) -> (integer, U), {U}, integer)
 load : (string|(any*) -> (any*), string?, string?, any) -> (() -> (any*))?
 loadfile : (string?, string?, any) -> (() -> (any*))?
 next : ({any:any}, any) -> (any, any)
