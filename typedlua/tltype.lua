@@ -1010,6 +1010,41 @@ local function subtype_parameter(env, t1, t2)
   return false
 end
 
+local function check_generic_structure(t1, t2, t1_pos, t2_pos)
+  if type(t1) ~= 'table' or type(t2) ~= 'table' then
+    return t1 == t2
+  end
+  if t1.tag ~= t2.tag then
+    return
+  end
+  if tltype.isParameter(t1) and tltype.isParameter(t2) then
+    if t1_pos[t1.id] ~= t2_pos[t2.id] then
+      return
+    end
+  end
+  for i, st in ipairs(t1) do
+    if not check_generic_structure(st, t2[i], t1_pos, t2_pos) then
+      return
+    end
+  end
+  return true
+end
+
+local function subtype_generic(env, t1, t2)
+  if tltype.isGeneric(t1) and tltype.isGeneric(t2) then
+    local t1_pos = {}
+    for i, v in ipairs(t1.type_params) do
+      t1_pos[v.id] = i
+    end
+    local t2_pos = {}
+    for i, v in ipairs(t2.type_params) do
+      t2_pos[v.id] = i
+    end
+    return check_generic_structure(t1, t2, t1_pos, t2_pos)
+  end
+end
+
+
 function subtype (env, t1, t2, relation)
   if tltype.isVoid(t1) and tltype.isVoid(t2) then
     return true
@@ -1060,6 +1095,7 @@ function subtype (env, t1, t2, relation)
            subtype_function(env, t1, t2, relation) or
            subtype_table(env, t1, t2, relation) or
            subtype_variable(env, t1, t2) or
+           subtype_generic(env, t1, t2) or
            subtype_parameter(env, t1, t2) or
            subtype_global_variable(env, t1, t2, relation) or
            subtype_recursive(env, t1, t2, relation)
@@ -1369,7 +1405,7 @@ end
 function tltype.infer_params(env, type_params, ptype, given, pos)
   local infered_subst = {}
   local failed = false
-  local function infer_step(ptype, given)
+  local function infer_step(ptype, given) -- TODO add relation direction
     if type(ptype) ~= 'table' or type(given) ~= 'table' then
       if ptype ~= given then
         failed = true
