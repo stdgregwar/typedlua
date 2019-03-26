@@ -85,7 +85,7 @@ local G = lpeg.P { "TypedLua";
   ArrayType = lpeg.Carg(3) * lpeg.V("FieldType") / tltype.ArrayField;
   KeyType = lpeg.V("BaseType") + lpeg.V("ValueType") + lpeg.V("AnyType");
   FieldType = lpeg.V("Type") * lpeg.Cc(tltype.Nil()) / tltype.Union;
-  VariableType = tllexer.token(tllexer.Name, "Type") / tltype.Variable;
+  VariableType = tllexer.token(tllexer.Name, "Type") * lpeg.V("TypeArgs")^-1 / tltype.Variable;
   RetType = lpeg.V("NilableTuple") +
             lpeg.V("Type") / tltype.retType;
   Id = lpeg.Cp() * tllexer.token(tllexer.Name, "Name") / tlast.ident;
@@ -96,7 +96,15 @@ local G = lpeg.P { "TypedLua";
   IdDec = lpeg.V("IdList") * tllexer.symb(":") *
           (lpeg.V("Type") + lpeg.V("MethodType")) / tltype.fieldlist;
   IdDecList = (lpeg.V("IdDec")^1 + lpeg.Cc(nil)) / tltype.Table;
-  TypeParams = lpeg.Cp() * (tllexer.symb("<") * lpeg.V("IdList") * tllexer.symb(">"))^-1 / tlast.typeParList;
+
+  TypeParamId = lpeg.Cp() * tllexer.token(tllexer.Name, "Name") / tlast.ident;
+  TypeParamPack = lpeg.Cp() * tllexer.token(tllexer.Name, "Name") * tllexer.symb("...") / tlast.identPack;
+  -- type id list with an optional type pack at the end
+  TypeIdList = lpeg.Cp() * lpeg.V("TypeParamId") *
+    (tllexer.symb(",") * lpeg.V("TypeParamId"))^0 *
+    (tllexer.symb(",") * lpeg.V("TypeParamPack"))^-1 / tlast.namelist +
+    lpeg.Cp() * lpeg.V("TypeParamPack") / tlast.namelist;
+  TypeParams = lpeg.Cp() * (tllexer.symb("<") * lpeg.V("TypeIdList") * tllexer.symb(">"))^-1 / tlast.typeParList;
   TypeDec = tllexer.token(tllexer.Name, "Name") * lpeg.V("TypeParams")* lpeg.V("IdDecList") * tllexer.kw("end");
   Interface = lpeg.Cp() * tllexer.kw("interface") * lpeg.V("TypeDec") /
               tlast.statInterface +

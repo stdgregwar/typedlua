@@ -152,9 +152,24 @@ local function get_interface (env, name, pos)
   end
 end
 
+local function check_generic_instanciation(env, type_args, t)
+  if not tltype.isGeneric(t) then
+    typeerror(env, "generic", string.format(
+                "could not parametrize non-generic type %s",
+                bold_token(env ,tltype.tostring(t)),
+                bold_token), exp.pos)
+  elseif #type_args ~= #t.type_params then
+    typeerror(env, "generic", string.format(
+                "type parameter arity mismatch (expected %d but got %d)",
+                #t.type_params, #type_args), exp.pos)
+  end
+
+  -- enough arguments, instanciate
+  return tltype.instanciate_generic(t, type_args)
+end
+
 local function replace_names (env, t, pos, ignore)
   ignore = ignore or {}
-  local dont_name = env.dont_name or {}
   if tltype.isRecursive(t) then
     local link = ignore[t[1]]
     ignore[t[1]] = true
@@ -190,7 +205,16 @@ local function replace_names (env, t, pos, ignore)
   elseif tltype.isVariable(t) then
     if not ignore[t[1]] then
       local r = replace_names(env, get_interface(env, t[1], pos), pos, ignore)
-      if not dont_name[t[1]] then
+      local type_args = t.type_args
+      if type_args then
+        local gen = r
+        r = replace_names(env, check_generic_instanciation(env, type_args, r), pos, ignore)
+        local l = {}
+        for i, ta in ipairs(type_args) do
+          table.insert(l, tltype.tostring(ta))
+        end
+        r.name = string.format("%s<%s>",t[1],table.concat(l,", "))
+      else
         r.name = t[1]
       end
       return r
@@ -313,6 +337,11 @@ local function check_interface (env, stm)
     msg = string.format(msg, name)
     typeerror(env, "alias", msg, stm.pos)
   else
+    -- check if interface is generic
+    if stm.type_params.names then
+      t = tltype.makeGeneric(stm.type_params, t)
+    end
+
     check_self(env, t, t, stm.pos)
     local t = replace_names(env, t, stm.pos)
     t.name = name
@@ -1083,9 +1112,8 @@ local function check_call (env, exp)
     -- try to infer passed types
     local gfunc = t[1]
     local gargtuple = gfunc[1]
-    local infered_params = tltype.infer_params(env, t.type_params, gargtuple, inferred_type,exp1.pos)
+    local infered_params = tltype.infer_params(env, t.type_params, replace_names(env,gargtuple,exp1.pos), inferred_type,exp1.pos)
     if infered_params then
-      print(tltype.tostring(infered_params))
       t = tltype.instanciate_generic(t, infered_params)
     end
   end
@@ -1697,19 +1725,7 @@ local function check_id (env, exp)
   -- check for type arguments
   local type_args = exp.type_args
   if type_args and #type_args > 0 then
-    if not tltype.isGeneric(t) then
-      typeerror(env, "generic", string.format(
-                  "could not parametrize non-generic type %s",
-                  bold_token(env ,tltype.tostring(t)),
-                  bold_token), exp.pos)
-    elseif #type_args ~= #t.type_params then
-      typeerror(env, "generic", string.format(
-                  "type parameter arity mismatch (expected %d but got %d)",
-                  #t.type_params, #type_args), exp.pos)
-    end
-
-    -- enough arguments, instanciate
-    t = tltype.instanciate_generic(t, type_args)
+    t = check_generic_instanciation(env, type_args, t)
   end
 
   set_type(exp, t)

@@ -220,9 +220,6 @@ end
 
 -- statInterface : (number, string, type) -> (stat)
 function tlast.statInterface (pos, name, type_params, t)
-  if not t then
-    print("wut")
-  end
   t.interface = name
   return { tag = "Interface", pos = pos, [1] = name, [2] = t, type_params=type_params}
 end
@@ -408,6 +405,10 @@ end
 -- ident : (number, string, type?) -> (ident)
 function tlast.ident (pos, str, t)
   return { tag = "Id", pos = pos, [1] = str, [2] = t }
+end
+
+function tlast.identPack(pos, str)
+  return { tag = "Id", pos = pos, [1] = str, pack=true}
 end
 
 -- index : (number, expr, expr) -> (lhs)

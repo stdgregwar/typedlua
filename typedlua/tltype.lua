@@ -426,6 +426,11 @@ local function variables_to_parameters(type_params, t)
       -- change variable into a Parameter
       return tltype.Parameter(names[t[1]])
     end
+    if t.type_args then -- if we have type parameter currying in interfaces or typealiases
+      for i, ta in ipairs(t.type_args) do
+        t.type_args[i] = subst(names, ta)
+      end
+    end
     for i, ts in ipairs(t) do
       t[i] = subst(names, ts)
     end
@@ -540,6 +545,8 @@ function tltype.checkTypeDec (n, t)
       return true
     elseif tltype.isUnion(t) then
       return true
+    elseif t.type_args then
+      return true -- if type is parametric, let's handle it later
     else
       return nil, "attempt to name a type that is not a table"
     end
@@ -552,8 +559,8 @@ end
 -- type variables
 
 -- Variable : (string) -> (type)
-function tltype.Variable (name)
-  return { tag = "TVariable", [1] = name }
+function tltype.Variable (name, type_args)
+  return { tag = "TVariable", [1] = name , type_args=type_args}
 end
 
 -- isVariable : (type) -> (boolean)
@@ -1324,7 +1331,15 @@ local function type2str (t, n)
     end
     return "{" .. table.concat(l, ", ") .. "}"
   elseif tltype.isVariable(t) then
-    return t[1]
+    if t.type_args then
+      local l = {}
+      for i, ta in ipairs(t.type_args) do
+        table.insert(l,type2str(ta))
+      end
+      return string.format("%s<%s>",t[1],table.concat(l,", "))
+    else
+      return t[1]
+    end
   elseif tltype.isGlobalVariable(t) then
     if t[5] then
       return t[5] .. "." .. t[1]
@@ -1436,9 +1451,6 @@ function tltype.infer_params(env, type_params, ptype, given, pos)
     elseif subtype(env,ptype, given) then
       return
     else
-      if type(ptype) == 'string' then
-        print("wut")
-      end
       for i, pt in ipairs(ptype) do
         infer_step(pt, given[i])
       end
@@ -1447,6 +1459,10 @@ function tltype.infer_params(env, type_params, ptype, given, pos)
 
   infer_step(ptype, given)
   if failed then
+    tltype.typeerror(env, "inference", string.format(
+                      "could not infer types parameters from template %s and arguments %s",
+                      type2str(ptype), type2str(given)), pos
+    )
     return false
   end
 

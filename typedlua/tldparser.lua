@@ -78,7 +78,7 @@ local G = lpeg.P { "TypedLuaDescription";
   ArrayType = lpeg.Carg(3) * lpeg.V("FieldType") / tltype.ArrayField;
   KeyType = lpeg.V("BaseType") + lpeg.V("ValueType") + lpeg.V("AnyType");
   FieldType = lpeg.V("Type") * lpeg.Cc(tltype.Nil()) / tltype.Union;
-  VariableType = tllexer.token(tllexer.Name, "Type") / tltype.Variable;
+  VariableType = tllexer.token(tllexer.Name, "Type") * lpeg.V("TypeArgs")^-1 / tltype.Variable;
   RetType = lpeg.V("NilableTuple") +
             lpeg.V("Type") * lpeg.Carg(2) / tltype.retType;
   Id = lpeg.Cp() * tllexer.token(tllexer.Name, "Name") / tlast.ident;
@@ -90,6 +90,7 @@ local G = lpeg.P { "TypedLuaDescription";
           (lpeg.V("Type") + lpeg.V("MethodType")) / tltype.fieldlist;
   IdDecList = (lpeg.V("IdDec")^1 + lpeg.Cc(nil)) / tltype.Table;
   TypeParams = lpeg.Cp() * (tllexer.symb("<") * lpeg.V("IdList") * tllexer.symb(">"))^-1 / tlast.typeParList;
+  TypeArgs = tllexer.symb("<") * lpeg.V("TupleType") * tllexer.symb(">");
   MandatoryTypeParams = lpeg.Cp() * tllexer.symb("<") * lpeg.V("IdList") * tllexer.symb(">") / tlast.typeParList;
   TypeDec = tllexer.token(tllexer.Name, "Name") * lpeg.V("TypeParams")* lpeg.V("IdDecList") * tllexer.kw("end");
   Interface = lpeg.Cp() * tllexer.kw("interface") * lpeg.V("TypeDec") /

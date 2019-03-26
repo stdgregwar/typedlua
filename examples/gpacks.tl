@@ -1,0 +1,3 @@
+local function id<V...>(... : V) : V
+      return ...
+end
