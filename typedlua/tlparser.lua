@@ -98,7 +98,7 @@ local G = lpeg.P { "TypedLua";
   IdDecList = (lpeg.V("IdDec")^1 + lpeg.Cc(nil)) / tltype.Table;
 
   TypeParamId = lpeg.Cp() * tllexer.token(tllexer.Name, "Name") / tlast.ident;
-  TypeParamPack = lpeg.Cp() * tllexer.token(tllexer.Name, "Name") * tllexer.symb("...") / tlast.identPack;
+  TypeParamPack = lpeg.Cp() * tllexer.symb("...") * tllexer.token(tllexer.Name, "Name")  / tlast.identPack;
   -- type id list with an optional type pack at the end
   TypeIdList = lpeg.Cp() * lpeg.V("TypeParamId") *
     (tllexer.symb(",") * lpeg.V("TypeParamId"))^0 *

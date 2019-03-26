@@ -1,3 +1,3 @@
-local function id<V...>(... : V) : V
+local function id<...V>(... : V) : V
       return ...
 end

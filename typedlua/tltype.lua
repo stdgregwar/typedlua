@@ -1420,7 +1420,16 @@ end
 function tltype.infer_params(env, type_params, ptype, given, pos)
   local infered_subst = {}
   local failed = false
-  local function infer_step(ptype, given) -- TODO add relation direction
+
+  local function infer_subtype(env, t1, t2, rev)
+    if rev then
+      return subtype(env, t2, t1)
+    else
+      return subtype(env, t1, t2)
+    end
+  end
+
+  local function infer_step(ptype, given, rev) -- TODO add relation direction
     if type(ptype) ~= 'table' or type(given) ~= 'table' then
       if ptype ~= given then
         failed = true
@@ -1433,9 +1442,9 @@ function tltype.infer_params(env, type_params, ptype, given, pos)
       if already then
         -- is already infered type compatible ?
         -- TODO take function case into consideration
-        if subtype(env, given, already) then
+        if infer_subtype(env, given, already, rev) then
           return
-        elseif subtype(env, already, given) then
+        elseif not rev and infer_subtype(env, already, given) then
           infered_subst[name] = given
           return
         end
@@ -1448,11 +1457,24 @@ function tltype.infer_params(env, type_params, ptype, given, pos)
         infered_subst[ptype.name] = given
         return
       end
-    elseif subtype(env,ptype, given) then
+    elseif subtype(env,ptype, given, rev) then
       return
     else
-      for i, pt in ipairs(ptype) do
-        infer_step(pt, given[i])
+      if ptype.tag ~= given.tag then
+        tltype.typeerror(env, "inference", string.format(
+                           "cannot deduce types argument for %s from %s",
+                           type2str(ptype), type2str(given)), pos)
+        failed = true
+        return
+      end
+      if tltype.isFunction(ptype) then
+        infer_step(ptype[1],given[1], not rev)
+        infer_step(ptype[2],given[2], rev)
+        return
+      else
+        for i, pt in ipairs(ptype) do
+          infer_step(pt, given[i], rev)
+        end
       end
     end
   end
