@@ -1438,6 +1438,7 @@ function tltype.infer_params(env, type_params, ptype, given, pos)
     end
     if tltype.isParameter(ptype) then
       local name = ptype.name
+      -- TODO use TParameter ids instead of names
       local already = infered_subst[name]
       if already then
         -- is already infered type compatible ?

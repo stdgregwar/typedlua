@@ -33,7 +33,7 @@ end
 local is : {Box<number>} = {box(2.1), box(1.1)}
 local ss : {StrangeBox<number>} = {sbox(2.2), sbox(3.3)}
 
-local function map<U, V>(array : {U}, f : (U) -> (V))
+local function map<U>(array : {U}, f : <V> -> (U) -> (V))
       local res : {V} = {}
       for i, v in ipairs(array) do
           res[i] = f(v)
@@ -41,12 +41,34 @@ local function map<U, V>(array : {U}, f : (U) -> (V))
       return res
 end
 
+local function bla<T>(t: T): T return t end
+-- bla : <T> -> T -> T
+local myblaN : number -> number = bla<number>
+local mybla :  = map<number, _>
+
 local function sunbox<U>(e : StrangeBox<U>) : U return e.copy end
 
-local is = map(is, sunbox<number>)
+local strs : {string} = {"aa", "bb"}
+
+-- failing TODO fix
+-- local is = map<Box<number>, number>(is, unbox<number>)
+
+local is = map(map(is, unbox<number>), (i: number) -> tostring(i))
+
+local mapboxtonum = map<Box<number>, number>
+
+local bs = map(strs, (s: string) -> s .. s)
 local ss = map(ss, unbox<number>)
 
-local function check_num(a : number) print(a) end
-local val = unbox(box(42))
-check_num(val)
+print(is, bs, ss)
+
+-- local function check_num(a : number) print(a) end
+-- local val = unbox(box(42))
+-- check_num(val)
+
+local obj: <T>{} = {}
+
+function obj:meth1(u : U) end
+         self:empty(
+
 
