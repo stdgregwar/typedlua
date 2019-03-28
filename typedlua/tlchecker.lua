@@ -152,16 +152,18 @@ local function get_interface (env, name, pos)
   end
 end
 
-local function check_generic_instanciation(env, type_args, t)
+local function check_generic_instanciation(env, type_args, t, pos)
   if not tltype.isGeneric(t) then
     typeerror(env, "generic", string.format(
                 "could not parametrize non-generic type %s",
                 bold_token(env ,tltype.tostring(t)),
-                bold_token), exp.pos)
+                bold_token), pos)
+    return
   elseif #type_args ~= #t.type_params then
     typeerror(env, "generic", string.format(
                 "type parameter arity mismatch (expected %d but got %d)",
-                #t.type_params, #type_args), exp.pos)
+                #t.type_params, #type_args), pos)
+    return
   end
 
   -- enough arguments, instanciate
@@ -205,17 +207,19 @@ local function replace_names (env, t, pos, ignore)
   elseif tltype.isVariable(t) then
     if not ignore[t[1]] then
       local r = replace_names(env, get_interface(env, t[1], pos), pos, ignore)
+      r.name = t[1]
       local type_args = t.type_args
       if type_args then
         local gen = r
-        r = replace_names(env, check_generic_instanciation(env, type_args, r), pos, ignore)
-        local l = {}
-        for i, ta in ipairs(type_args) do
-          table.insert(l, tltype.tostring(ta))
+        local inst = check_generic_instanciation(env, type_args, r, pos)
+        if inst then
+          r = replace_names(env, inst, pos, ignore)
+          local l = {}
+          for i, ta in ipairs(type_args) do
+            table.insert(l, tltype.tostring(ta))
+          end
+          r.name = string.format("%s<%s>",t[1],table.concat(l,", "))
         end
-        r.name = string.format("%s<%s>",t[1],table.concat(l,", "))
-      else
-        r.name = t[1]
       end
       return r
     else
@@ -1725,7 +1729,10 @@ local function check_id (env, exp)
   -- check for type arguments
   local type_args = exp.type_args
   if type_args and #type_args > 0 then
-    t = check_generic_instanciation(env, type_args, t)
+    local inst = check_generic_instanciation(env, type_args, t, exp.pos)
+    if inst then
+      t = replace_names(env, inst, exp.pos) -- make sure we let only unnammed types out
+    end
   end
 
   set_type(exp, t)
