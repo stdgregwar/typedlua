@@ -172,8 +172,9 @@ element is itself expanded with `tl-rx-to-string'. "
           (tl-token
            :rx (or "+" "-" "*" "/" "%" "^" "#" "==" "~=" "<=" ">=" "<"
                    ">" "=" ";" ":" "," "." ".." "..."))
-          (tl-type-params
-           :rx (seq "<" ws ">"))
+          (tl-type-def
+           :rx (seq (or (seq (symbol "interface") ws (group-n 1 tl-name))
+                        (seq (symbol "typealias") ws (group-n 1 tl-name)))))
           (tl-keyword
            :rx (symbol "and" "break" "do" "else" "elseif" "end"  "for" "function"
                        "goto" "if" "in" "local" "not" "or" "repeat" "return"
@@ -566,6 +567,9 @@ Groups 6-9 can be used in any of argument regexps."
     (,(tl-rx tl-keyword)
      . font-lock-keyword-face)
 
+    ;; TypeParams
+    ("<[^<>]*>". font-lock-type-face)
+
     ;; Labels used by the "goto" statement
     ;; Highlights the following syntax:  ::label::
     (,(tl-rx "::" ws tl-name ws "::")
@@ -598,7 +602,6 @@ Groups 6-9 can be used in any of argument regexps."
     ;;        ^^^^^^
     ("^[ \t]*\\_<local\\_>"
      (0 font-lock-keyword-face)
-
      ;; (* nonl) at the end is to consume trailing characters or otherwise they
      ;; delimited matcher would attempt to parse them afterwards and wrongly
      ;; highlight parentheses as incorrect variable name characters.
@@ -612,6 +615,10 @@ Groups 6-9 can be used in any of argument regexps."
       (1 font-lock-variable-name-face nil noerror)
       (2 font-lock-warning-face t noerror)
       (3 font-lock-warning-face t noerror)))
+
+    (,(tl-rx point ws tl-type-def (* nonl))
+     nil nil
+     (1 font-lock-type-face))
 
     (,(tl-rx (or bol ";") ws tl-funcheader)
      (1 font-lock-function-name-face))

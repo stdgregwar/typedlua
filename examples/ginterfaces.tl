@@ -42,7 +42,7 @@ local function map<U, V>(array : {U}, f : (U) -> (V))
 end
 
 local function sunbox<U>(e : StrangeBox<U>) : U return e.copy end
-
+ 
 -- local strs : {string} = {"aa", "bb"}
 
 -- failing TODO fix
@@ -60,4 +60,3 @@ local is = map<Box<number>, number>(is, unbox<number>)
 -- local function check_num(a : number) print(a) end
 -- local val = unbox(box(42))
 -- check_num(val)
-

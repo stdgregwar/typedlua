@@ -24,7 +24,7 @@ local Number = tltype.Number()
 local String = tltype.String()
 local Integer = tltype.Integer(false)
 
-local check_block, check_stm, check_exp, check_var, check_var_exps, check_require, check_localrec
+local check_block, check_stm, check_exp, check_var, check_var_exps, check_require, check_localrec, check_function
 
 local acolor = {
   red     = "\27[31;1m",
@@ -286,6 +286,10 @@ local function infer_return_type (env)
 end
 
 local function check_masking (env, local_name, pos)
+  if local_name == '_' then
+    return -- dont signal masking for don't care variables
+  end
+
   local function lineno (s, i)
     if i == 1 then return 1, 1 end
     local rest, num = s:sub(1,i):gsub("[^\n]*\n", "")
@@ -306,9 +310,11 @@ end
 local function check_unused_locals (env)
   local l = tlst.unused(env)
   for k, v in pairs(l) do
-    local bold_token = env.color and acolor.bold .. "'%s'" .. acolor.reset or "'%s'"
-    local msg = string.format("unused local " .. bold_token, k)
-    typeerror(env, "unused", msg, v.pos)
+    if k ~= '_' then
+      local bold_token = env.color and acolor.bold .. "'%s'" .. acolor.reset or "'%s'"
+      local msg = string.format("unused local " .. bold_token, k)
+      typeerror(env, "unused", msg, v.pos)
+    end
   end
 end
 
@@ -882,7 +888,30 @@ local function check_return_type (env, inf_type, dec_type, pos)
   end
 end
 
-local function check_function (env, exp, tself)
+local function check_generic_function_def(env, fundef, tself)
+  local param_names = fundef.type_params.names
+
+  --begin function scope
+  tlst.begin_scope(env)
+
+  for i, var in ipairs(param_names) do
+    tlst.set_interface(env, var[1], tltype.Parameter(var), true)
+    -- tlst.set_dont_name(env, var[1])
+  end
+
+  -- create a dummy name for the function instance
+  check_function(env, fundef, tself, true)
+  tlst.end_scope(env)
+  local deduced_type = get_type(fundef)
+  set_type(fundef, tltype.Generic(param_names,deduced_type))
+end
+
+function check_function (env, exp, tself, ignore_generic)
+  if exp.type_params.names and not ignore_generic then
+    check_generic_function_def(env, exp, tself)
+    return
+  end
+
   local oself = env.self
   env.self = tself
   local idlist, ret_type, block = exp[1], replace_names(env, exp[2], exp.pos), exp[3]
@@ -1077,7 +1106,8 @@ local function replace_self (env, t, tself)
 end
 
 
-local function check_generic_function_def(env, id, fundef)
+
+local function check_generic_local_function_def(env, id, fundef)
   local param_names = fundef.type_params.names
 
 
@@ -1333,7 +1363,7 @@ function check_localrec (env, id, exp, ignore_generic)
 
   -- is function generic ?
   if exp.type_params.names and not ignore_generic then
-    check_generic_function_def(env, id, exp)
+    check_generic_local_function_def(env, id, exp)
     return false
   end
 

@@ -1,42 +1,15 @@
-local interface CoroHandle<I,O>
-   resume : (I) -> (boolean, O)
-   status : () -> (string)
-end
+-- @author stdgregwar
+-- safe_coroutine library test
 
-local interface CoroThread<I,O>
-   yield : (O) -> (I)
-end
+local safe_coroutine = require'examples.gcoro_lib'
 
--- create a typed coroutine wrapper, supports only single argument exchanges
-local function coroutine_create<I,O>(f : (CoroThread<I,O> ,I) -> (O)) : CoroHandle<I,O>
-    local thread = coroutine.create(f)
-    local first = true
-    local coro_thread = {
-        yield = function(o : O) : I
-            return coroutine.yield(o)
-        end
-    }
-    return {
-      resume = function(i : I) : (boolean, O)
-        if first then
-           first = false
-           -- we need to pass the coro thread on the first resume so that
-           -- the function gets it as an argument, later resume should not give it
-           return coroutine.resume(thread, coro_thread, i)
-        else
-           return coroutine.resume(thread, i)
-        end
-      end,
-      status = function() : string
-             return coroutine.status(thread)
-      end
-    }
-end
-
+--------------------------------------------------------------------
+-- first simple example as a producer, consumer, almost function-like
+--------------------------------------------------------------------
 local function check_string(n : string) print(n) end
 
-local chandle = coroutine_create(
-    function(thread : CoroThread<number,string>, n : number) : string
+local chandle = safe_coroutine.create(
+   function(thread : CoroThread<number,string>, n : number) : string
        while true do
           n = thread.yield(tostring(n))
        end
@@ -47,4 +20,45 @@ local chandle = coroutine_create(
 for i = 1,10 do
     local s, n = chandle.resume(i)
     check_string(n)
+end
+
+--------------------------------------------------------------------
+-- second exemple that use coroutine as iterator makers, lua example
+-- at https://www.lua.org/pil/9.3.html
+--------------------------------------------------------------------
+-- permutation generator
+local function permgen(thread : CoroThread<nil,{number}?> , a : {number}) : {number}?
+   local function permgen(a : {number}, n : integer)
+      if n == 0 then
+         thread.yield(a)
+      else
+         for i=1,n do
+            -- put i-th element as the last one
+            a[n], a[i] = a[i], a[n]
+
+            -- generate all permutations of the other elements
+            permgen(a, n - 1)
+
+            -- restore i-th element
+            a[n], a[i] = a[i], a[n]
+         end
+      end
+   end
+   return permgen(a, #a)
+end
+
+local function perm(a : {number})
+   return safe_coroutine.wrap(
+      function(thread : CoroThread<nil,{number}?>,_ : nil) : {number}?
+        permgen(thread, a)
+   end)
+end
+
+local function check_num(n : number) io.write(n, ' ') end
+
+for a in perm{1,2,3,4,5} do
+   for _, e in ipairs(a) do
+      check_num(e)
+      io.write('\n')
+   end
 end

@@ -12,5 +12,4 @@ local us : {number}= {1,2,3,4,5}
 
 -- type parameter are infered
 local vs = map(us, tostring)
-
-local dus = map(us, (n : number) -> n*2)
+local dus = map(map(us, (n : number) -> n*2), tostring)

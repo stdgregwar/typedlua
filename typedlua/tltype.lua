@@ -1437,25 +1437,23 @@ function tltype.infer_params(env, type_params, ptype, given, pos)
       return
     end
     if tltype.isParameter(ptype) then
-      local name = ptype.name
-      -- TODO use TParameter ids instead of names
-      local already = infered_subst[name]
+      local id = ptype.id
+      local already = infered_subst[id]
       if already then
         -- is already infered type compatible ?
-        -- TODO take function case into consideration
         if infer_subtype(env, given, already, rev) then
           return
         elseif not rev and infer_subtype(env, already, given) then
-          infered_subst[name] = given
+          infered_subst[id] = given
           return
         end
         -- error, cannot concile types
         tltype.typeerror(env, "inference", string.format(
                            "cannot concile types %s and %s during inference of parameter %s",
-        type2str(already), type2str(given), name), pos)
+        type2str(already), type2str(given), ptype.name), pos)
         failed = true
       else
-        infered_subst[ptype.name] = given
+        infered_subst[ptype.id] = given
         return
       end
     elseif subtype(env,ptype, given, rev) then
@@ -1491,7 +1489,7 @@ function tltype.infer_params(env, type_params, ptype, given, pos)
 
   local types = {}
   for i, id in ipairs(type_params) do --TODO check arity and definedness
-    local t = infered_subst[id[1]]
+    local t = infered_subst[id.id]
     if not t then
       tltype.typeerror(env, "inference", string.format(
                          "not enough information to infer type variable %s", id[1]
