@@ -195,7 +195,7 @@ local G = lpeg.P { "TypedLua";
               lpeg.V("SuffixedExp");
   SuffixedExp = lpeg.Cf(lpeg.V("PrimaryExp") * (
                 (lpeg.Cp() * tllexer.symb(".") *
-                  (lpeg.Cp() * tllexer.token(tllexer.Name, "Name") / tlast.exprString)) /
+                  (lpeg.Cp() * tllexer.token(tllexer.Name, "Name") * lpeg.V("TypeArgs")^-1 / tlast.exprString)) /
                   tlast.exprIndex +
                 (lpeg.Cp() * tllexer.symb("[") * lpeg.V("Expr") * tllexer.symb("]")) /
                 tlast.exprIndex +

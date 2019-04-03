@@ -18,7 +18,7 @@ local chandle = safe_coroutine.create(
 )
 
 for i = 1,10 do
-    local s, n = chandle.resume(i)
+    local _, n = chandle.resume(i)
     check_string(n)
 end
 
@@ -59,6 +59,6 @@ local function check_num(n : number) io.write(n, ' ') end
 for a in perm{1,2,3,4,5} do
    for _, e in ipairs(a) do
       check_num(e)
-      io.write('\n')
    end
+   io.write('\n')
 end

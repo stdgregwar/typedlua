@@ -1797,6 +1797,11 @@ local function check_index (env, exp)
       typeerror(env, "index", msg, exp.pos)
       set_type(exp, Nil)
     end
+  -- elseif tltype.isUnion(t1) then -- if all unions members have the field
+  --   local field_type = tltype.indexUnion(t1, t2)
+  --   if field_type then
+  --     set_type(exp, field_type)
+  --   end
   elseif tltype.isAny(t1) then
     set_type(exp, Any)
     msg = string.format(msg, tltype.tostring(t1), tltype.tostring(t2))

@@ -282,6 +282,29 @@ function tltype.UnionNil (t, is_union_nil)
   end
 end
 
+
+function tltype.indexUnion(union, indice)
+  -- cannot do anything if we don't know the key
+  if not tltype.isLiteral(indice) then
+    return false
+  end
+
+  -- check that all member are tables with same key
+  local ct = tltype.Any()
+  for _, member in ipairs(union) do
+    if not tltype.isTable(member) then
+      return false
+    end
+
+    local t = tltype.unfold(tltype.getField(indice, union))
+    if tltype.consistent_subtype(t, ct) then
+      ct = t
+    elseif not tltype.consistent_subtype(ct, t) then
+      return false -- types are not compatible
+    end
+  end
+  return ct
+end
 -- vararg types
 
 -- Vararg : (type) -> (type)
