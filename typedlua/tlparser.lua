@@ -200,7 +200,7 @@ local G = lpeg.P { "TypedLua";
                 (lpeg.Cp() * tllexer.symb("[") * lpeg.V("Expr") * tllexer.symb("]")) /
                 tlast.exprIndex +
                 (lpeg.Cp() * lpeg.Cg(tllexer.symb(":") *
-                   (lpeg.Cp() * tllexer.token(tllexer.Name, "Name") / tlast.exprString) *
+                  (lpeg.Cp() * tllexer.token(tllexer.Name, "Name") * lpeg.V("TypeArgs")^-1 / tlast.exprString) *
                    lpeg.V("FuncArgs"))) / tlast.invoke +
                 (lpeg.Cp() * lpeg.V("FuncArgs")) / tlast.call)^0, tlast.exprSuffixed);
   PrimaryExp = lpeg.V("Var") +

@@ -311,8 +311,8 @@ function tlast.exprNumber (pos, num)
 end
 
 -- exprString : (number, string) -> (expr)
-function tlast.exprString (pos, str)
-  return { tag = "String", pos = pos, [1] = str }
+function tlast.exprString (pos, str, type_args)
+  return { tag = "String", pos = pos, [1] = str, type_args = type_args}
 end
 
 -- exprFunction : (number, parlist, type|stat, stat?) -> (expr)

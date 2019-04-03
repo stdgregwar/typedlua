@@ -1785,6 +1785,18 @@ local function check_index (env, exp)
   if tltype.isTable(t1) then
     -- FIX: methods should not leave objects, this is unsafe!
     local field_type = tltype.unfold(replace_self(env, tltype.getField(t2, t1), tltype.Any()))
+
+    -- if type is generic and we have arguments, try to instanciate
+    if tltype.isGeneric(field_type) then
+      if exp2.type_args then
+        print("type args")
+        local gt = check_generic_instanciation(env, exp2.type_args, field_type, exp2.pos)
+        if gt then
+          field_type = gt
+        end
+      end
+    end
+
     if not tltype.isNil(field_type) then
       set_type(exp, field_type)
     else
