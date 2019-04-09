@@ -12,4 +12,7 @@ local us : {number}= {1,2,3,4,5}
 
 -- type parameter are infered
 local vs = map(us, tostring)
-local dus = map(map(us, (n : number) -> n*2), tostring)
+
+local ss : {string} = {'123', '253'}
+
+local dss = map(ss, tonumber)

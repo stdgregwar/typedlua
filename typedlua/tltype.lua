@@ -1466,7 +1466,7 @@ function tltype.infer_params(env, type_params, ptype, given, pos)
         -- is already infered type compatible ?
         if infer_subtype(env, given, already, rev) then
           return
-        elseif not rev and infer_subtype(env, already, given) then
+        elseif infer_subtype(env, already, given, rev) then
           infered_subst[id] = given
           return
         end

@@ -7,14 +7,12 @@ local typealias Exp = {"tag":"Number", "val":number}
 local function check_type(s : string)
 end
 
-local function simple(s : string | number) : number?
-   if type(s) == 'string' then
-      return tonumber(s)
-   else
-      return s
-   end
-end
-
+-- local function simple(s : string | number) : number?
+--    if type(s) == 'string' then
+--       return tonumber(s)
+--    end
+--       return s
+-- end
 
 local function eval (e: Exp ): number
    if e.tag == "Number" then
