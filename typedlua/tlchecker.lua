@@ -907,7 +907,7 @@ local function check_generic_function_def(env, fundef, tself)
 end
 
 function check_function (env, exp, tself, ignore_generic)
-  if exp.type_params.names and not ignore_generic then
+  if exp.type_params and exp.type_params.names and not ignore_generic then
     check_generic_function_def(env, exp, tself)
     return
   end
