@@ -462,6 +462,19 @@ function tlast.setConst (t)
   return t
 end
 
+function tlast.setMeta(t)
+  t.meta = true
+  return t
+end
+
+
+-- tlast.hasSideEffects
+function tlast.hasSideEffects(t)
+  return t.tag ~= 'Local' and
+    t.tag ~= 'Localrec' and
+    t.tag ~= 'Set' --TODO complete ME !
+end
+
 -- tostring
 
 local block2str, stm2str, exp2str, var2str, type2str

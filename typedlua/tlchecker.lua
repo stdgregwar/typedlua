@@ -318,6 +318,19 @@ local function check_unused_locals (env)
   end
 end
 
+local function check_forward_declarations(env, pos)
+  for id, v in tlst.get_scope_locals(env) do
+    local decl_type = v[2]
+    local t = get_type(v)
+    if v.forward and not tltype.subtype(t, decl_type) then
+      typeerror(env, "forward", string.format(
+          "local '%s' was declared as %s but still has type %s",
+          id, tltype.tostring(decl_type), tltype.tostring(v.type)
+                                             ), v.pos)
+    end
+  end
+end
+
 local function check_tl (env, name, path, pos)
   local file = io.open(path, "r")
   local subject = file:read("*a")
@@ -1124,7 +1137,13 @@ local function check_generic_local_function_def(env, id, fundef)
   tlst.end_scope(env)
   tlst.set_local(env, id)
   local deduced_type = get_type(id)
-  set_type(id, tltype.Generic(param_names,get_type(id)))
+  local t = tltype.Generic(param_names, deduced_type)
+  set_type(id, t)
+  set_ubound(id, t)
+end
+
+local function metatable_call_type(env, tpe1, tpe2)
+
 end
 
 local function check_call (env, exp)
@@ -1287,8 +1306,10 @@ local function check_local_var (env, id, inferred_type, close_local)
         set_type(id, local_type)
         set_ubound(id, local_type)
       elseif tltype.isNil(inferred_type) then -- pretend that the user declared it as t|nil
-        set_type(id, inferred_type)
-        set_ubound(id, tltype.Union(local_type, Nil))
+        -- SILLY, we should be able to forward declare and then have guarantee about the concrete type
+        set_type(id, inferred_type) -- TODO sort out this problem
+        set_ubound(id, tltype.Union(local_type, Nil)) --don't give it the declared type for captured contexts
+        --id.forward = true -- mark this as forward declared
         id.narrow = true -- we should narrow this if we get the chance
       else
         typeerror(env, "local", msg, pos)
@@ -2028,6 +2049,9 @@ local function check_stms (env, block)
   local bkp = env.self
   local didgoto = false
   for i, v in ipairs(block) do
+    if tlast.hasSideEffects(v) then
+      --check_forward_declarations(env, v.pos) -- check forward declared locals
+    end
     local isret, isgoto = check_stm(env, v)
     r = r or isret
     didgoto = didgoto or isgoto
@@ -2041,12 +2065,14 @@ local function check_stms (env, block)
   end
   if didgoto then r = false end
   check_unused_locals(env)
+  --check_forward_declarations(env, block.pos)
   return r, didgoto
 end
 
 function check_block (env, block, loop)
   tlst.begin_scope(env, loop)
   local r, didgoto = check_stms(env, block)
+
   tlst.end_scope(env)
   return r, didgoto
 end

@@ -89,8 +89,10 @@ local G = lpeg.P { "TypedLua";
   RetType = lpeg.V("NilableTuple") +
             lpeg.V("Type") / tltype.retType;
   Id = lpeg.Cp() * tllexer.token(tllexer.Name, "Name") / tlast.ident;
-  TypeDecId = (tllexer.kw("const") * lpeg.V("Id") / tlast.setConst) +
-              lpeg.V("Id");
+  MetaId = (tllexer.symb('@') * lpeg.V("Id") / tlast.setMeta) +
+           lpeg.V("Id");
+  TypeDecId = (tllexer.kw("const") * lpeg.V("MetaId") / tlast.setConst) +
+              lpeg.V("MetaId");
   IdList = lpeg.Cp() * lpeg.V("TypeDecId") * (tllexer.symb(",") * lpeg.V("TypeDecId"))^0 /
     tlast.namelist;
   IdDec = lpeg.V("IdList") * tllexer.symb(":") *

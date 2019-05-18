@@ -146,7 +146,7 @@ function tltype.isNil (t)
   return t.tag == "TNil"
 end
 
--- value type
+-- value type, (top type)
 
 -- Value : () -> (type)
 function tltype.Value ()
@@ -156,6 +156,16 @@ end
 -- isValue : (type) -> (boolean)
 function tltype.isValue (t)
   return t.tag == "TValue"
+end
+
+-- nothing type, (botton type)
+
+function tltype.Nothing()
+  return {tag = "TNothing"}
+end
+
+function tltype.isNothing(t)
+  return t.tag == "TNothing"
 end
 
 -- dynamic type
@@ -487,8 +497,8 @@ end
 -- table types
 
 -- Field : (boolean, type, type) -> (field)
-function tltype.Field (is_const, t1, t2)
-  return { tag = "TField", const = is_const, [1] = t1, [2] = t2 }
+function tltype.Field (is_const, t1, t2, is_meta)
+  return { tag = "TField", const = is_const, [1] = t1, [2] = t2, meta = is_meta}
 end
 
 -- isField : (field) -> (boolean)
@@ -499,6 +509,10 @@ end
 -- isConstField : (field) -> (boolean)
 function tltype.isConstField (f)
   return f.tag == "TField" and f.const
+end
+
+function tltype.isMetaField(f)
+  return f.tag == "TField" and f.meta
 end
 
 -- ArrayField : (boolean, type) -> (field)
@@ -534,7 +548,7 @@ end
 function tltype.fieldlist (idlist, t)
   local l = {}
   for _, v in ipairs(idlist) do
-    table.insert(l, tltype.Field(v.const, tltype.Literal(v[1]), t))
+    table.insert(l, tltype.Field(v.const, tltype.Literal(v[1]), t, v.meta))
   end
   return table.unpack(l)
 end
@@ -656,7 +670,7 @@ local function unfold_recursive (tr, t)
   elseif tltype.isTable(t) then
     local l = {}
     for _, v in ipairs(t) do
-      table.insert(l, tltype.Field(v.const, v[1], unfold_recursive(tr, v[2])))
+      table.insert(l, tltype.Field(v.const, v[1], unfold_recursive(tr, v[2]), v.meta))
     end
     local r = tltype.Table(table.unpack(l))
     r.unique = t.unique
@@ -1032,6 +1046,10 @@ local function subtype_tuple (env, t1, t2, relation)
   end
 end
 
+local function subtype_nothing(env, t1, t2)
+  return tltype.isNothing(t1) -- don't care of t2 as long as t1 is bottom type
+end
+
 local function subtype_parameter(env, t1, t2)
   -- TODO take bounds into account
   if tltype.isParameter(t1) and tltype.isParameter(t2) then
@@ -1128,7 +1146,8 @@ function subtype (env, t1, t2, relation)
            subtype_generic(env, t1, t2) or
            subtype_parameter(env, t1, t2) or
            subtype_global_variable(env, t1, t2, relation) or
-           subtype_recursive(env, t1, t2, relation)
+           subtype_recursive(env, t1, t2, relation) or
+           subtype_nothing(env, t1, t2, relation)
   end
 end
 
@@ -1162,7 +1181,7 @@ function tltype.general (t)
   elseif tltype.isTable(t) then
     local l = {}
     for _, v in ipairs(t) do
-      table.insert(l, tltype.Field(v.const, v[1], tltype.general(v[2])))
+      table.insert(l, tltype.Field(v.const, v[1], tltype.general(v[2]), v.meta))
     end
     local n = tltype.Table(table.unpack(l))
     n.unique = t.unique
@@ -1310,6 +1329,8 @@ local function type2str (t, n)
     return "nil"
   elseif tltype.isValue(t) then
     return "value"
+  elseif tltype.isNothing(t) then
+    return "nothing"
   elseif tltype.isAny(t) then
     return "any"
   elseif tltype.isSelf(t) then
@@ -1348,6 +1369,9 @@ local function type2str (t, n)
     local l = {}
     for k, v in ipairs(t) do
       l[k] = type2str(v[1], n-1) .. ": " .. type2str(v[2], n-1)
+      if tltype.isMetaField(v) then
+        l[k] = '@' .. l[k]
+      end
       if tltype.isConstField(v) then
         l[k] = "const " .. l[k]
       end
@@ -1396,6 +1420,46 @@ function tltype.tostring (t, n)
   return type2str(t, n)
 end
 
+
+-- LUB to gain more occasions to infer types
+local function lowest_upper_bound(env, t1, t2, ignore_literal)
+  local function is_numeric(t)
+    return tltype.isNumber(t) or tltype.isInteger(t) or tltype.isNum(t)
+  end
+
+  
+  if subtype(env, t1, t2) then
+    return t2
+  elseif subtype(env, t2, t1) then
+    return t1
+  elseif ignore_literal and (tltype.isLiteral(t1) or tltype.isLiteral(t2)) then
+    return tltype.Value()
+  elseif subtype(env, t1, tltype.Integer()) and subtype(env, t2, tltype.Integer()) then
+    return tltype.Integer()
+  elseif subtype(env, t1, tltype.Number()) and subtype(env, t2, tltype.Number()) then
+    return tltype.Number()
+  elseif subtype(env, t1, tltype.String()) and subtype(env, t2, tltype.String()) then
+    return tltype.String()
+  elseif tltype.isTable(t1) and tltype.isTable(t2) then
+    local m, n = #t1, #t2
+    local int = {}
+    for i = 1, m do
+      for j = 1, n do
+        local k = lowest_upper_bound(env, t1[i][1], t2[j][1], true)
+        local v = lowest_upper_bound(env, t1[i][2], t2[j][2])
+        if not tltype.isValue(k) then
+          table.insert(int, tltype.Field(t1[i].const or t2[j].const, k, v, t1[i].meta))
+        end
+      end
+    end
+    return tltype.Table(table.unpack(int))
+  elseif tltype.isUnion(t1) and tltype.isUnion(t2) then
+    return tltype.Union(t1, t2) -- merge both union in a bigger one
+  end
+
+  return tltype.Value()
+end
+
 -- generic type instance
 
 local function param_subst(t, sub)
@@ -1441,18 +1505,32 @@ end
 -- type inference
 
 function tltype.infer_params(env, type_params, ptype, given, pos)
-  local infered_subst = {}
+  local infered_bounds = {}
   local failed = false
 
-  local function infer_subtype(env, t1, t2, rev)
-    if rev then
-      return subtype(env, t2, t1)
+  local function reverse_relation(rel)
+    return ({
+      ['<:'] = ':>',
+      [':>'] = '<:',
+      ['⁼'] = '='
+    })[rel]
+  end
+
+  local function combine_ctx(c1, c2)
+    if c1 == '_' then
+      return c2
+    elseif c1 == c2 then
+      return c1
+    elseif c1 == '=' or c2 == '=' then
+      return '='
+    elseif c1 == '<:' or c2 == '<:' then
+      return '<:'
     else
-      return subtype(env, t1, t2)
+      return c1
     end
   end
 
-  local function infer_step(ptype, given, rev) -- TODO add relation direction
+  local function infer_step(ptype, given, relation) -- TODO add relation direction
     if type(ptype) ~= 'table' or type(given) ~= 'table' then
       if ptype ~= given then
         failed = true
@@ -1461,25 +1539,46 @@ function tltype.infer_params(env, type_params, ptype, given, pos)
     end
     if tltype.isParameter(ptype) then
       local id = ptype.id
-      local already = infered_subst[id]
-      if already then
-        -- is already infered type compatible ?
-        if infer_subtype(env, given, already, rev) then
+      local bounds = infered_bounds[id]
+      local lower = bounds.l
+      local upper = bounds.u
+      bounds.ctx = combine_ctx(bounds.ctx, relation)
+
+      if relation == '<:' then
+        if subtype(env, given, lower) then
           return
-        elseif infer_subtype(env, already, given, rev) then
-          infered_subst[id] = given
+        elseif subtype(env, lower, given) then
+          bounds.l = given
+          return
+        else
+          bounds.l = lowest_upper_bound(env, lower, given)
           return
         end
-        -- error, cannot concile types
-        tltype.typeerror(env, "inference", string.format(
-                           "cannot concile types %s and %s during inference of parameter %s",
-        type2str(already), type2str(given), ptype.name), pos)
-        failed = true
-      else
-        infered_subst[ptype.id] = given
-        return
+      elseif relation == ':>' then
+        if subtype(env, upper, given) then
+          return
+        elseif subtype(env, given, upper) then
+          bounds.u = given
+          return
+        -- else
+        --   bounds.u = type_intersection(env, given, upper)
+        --   return
+        end
+      else -- invariant
+        if subtype(env, lower, given) and subtype(env, given, upper) then -- if type is in bounds, update
+          bounds.l, bounds.u = given, given
+        end
       end
-    elseif subtype(env,ptype, given, rev) then
+      -- error, cannot concile types
+      tltype.typeerror(env, "inference", string.format(
+                         "cannot concile type bound [%s <: %s <: %s] and %s (relation : '%s')",
+                         type2str(lower), ptype.name, type2str(upper), type2str(given), relation), pos)
+      failed = true
+    elseif relation == '<:' and subtype(env, ptype, given) then
+      return
+    elseif relation == ':>' and subtype(env, given, ptype) then
+      return
+    elseif relation == '=' and subtype(env, given, ptype) and subtype(env, ptype, given) then
       return
     else
       if ptype.tag ~= given.tag then
@@ -1490,18 +1589,27 @@ function tltype.infer_params(env, type_params, ptype, given, pos)
         return
       end
       if tltype.isFunction(ptype) then
-        infer_step(ptype[1],given[1], not rev)
-        infer_step(ptype[2],given[2], rev)
+        infer_step(ptype[1],given[1], reverse_relation(relation))
+        infer_step(ptype[2],given[2], relation)
         return
       else
         for i, pt in ipairs(ptype) do
-          infer_step(pt, given[i], rev)
+          infer_step(pt, given[i], relation)
         end
       end
     end
   end
 
-  infer_step(ptype, given)
+  -- fill subst with infinite bounds
+  for i, id in ipairs(type_params) do
+    infered_bounds[id.id] = {
+      l = tltype.Nothing(),
+      u = tltype.Value(),
+      ctx = '_'
+    }
+  end
+
+  infer_step(ptype, given, '<:')
   if failed then
     tltype.typeerror(env, "inference", string.format(
                       "could not infer types parameters from template %s and arguments %s",
@@ -1510,10 +1618,34 @@ function tltype.infer_params(env, type_params, ptype, given, pos)
     return false
   end
 
+  local function type_from_bounds(bounds)
+    local ctx = bounds.ctx
+    if subtype(env, bounds.l, bounds.u) then -- valid bounds
+      if ctx == '<:' then
+        return bounds.l
+      elseif ctx == ':>' then
+        return bounds.u
+      elseif ctx == '=' and subtype(env, bounds.u, bounds.l) and subtype(env, bounds.l, bounds.u) then
+        return bounds.u
+      elseif ctx == '_' then -- bounds not updated....
+        return nil -- TODO insufficient info message
+      end
+    end
+    return nil
+  end
+
   local types = {}
-  for i, id in ipairs(type_params) do --TODO check arity and definedness
-    local t = infered_subst[id.id]
-    if not t then
+  -- deduce concrete types from bounds
+  for i, id in ipairs(type_params) do
+    local bounds = infered_bounds[id.id]
+    local t = type_from_bounds(bounds)
+    -- tltype.typeerror(env, "inference", string.format(
+    --                    "bounds : [%s <: %s <: %s] ctx : '%s', chosen : %s", type2str(bounds.l),
+    --                    id[1],
+    --                    type2str(bounds.u), bounds.ctx,
+    --                    type2str(t and t or tltype.Void())),
+    --                  pos)
+    if not t then -- TODO better error messages
       tltype.typeerror(env, "inference", string.format(
                          "not enough information to infer type variable %s", id[1]
                                                       ),pos)

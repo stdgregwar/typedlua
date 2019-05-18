@@ -15,4 +15,4 @@ local function list<E>(t : {E}) : List<E>
       return make_list(t, 1)
 end
 
-local l = list<number>{1,2,3,4,5}
+local l = list<integer>{1,2,3,4,5}

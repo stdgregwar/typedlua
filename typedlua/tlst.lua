@@ -173,6 +173,12 @@ function tlst.unused (env)
   return env[scope]["unused"]
 end
 
+function tlst.get_scope_locals(env)
+  local scope = env.scope
+  local locals = env[scope]["local"]
+  return pairs(locals)
+end
+
 -- set_interface : (env, string, type, boolean?) -> ()
 function tlst.set_interface (env, name, t, is_local)
   if is_local then

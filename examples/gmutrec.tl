@@ -1,21 +1,26 @@
-local lib = {}
+-- local lib = {}
 
-function lib.g(meh : string)
-   lib.h(meh)
-end
+-- function lib.g(meh : string)
+--    lib.h(meh)
+-- end
 
-function lib.h(meh : string)
-   lib.g(meh)
-end
+-- function lib.h(meh : string)
+--    lib.g(meh)
+-- end
 
 --g forward declaration
 local g : (string) -> (string)
 
-local function f(meh : string)
-   return (g or function(n : string) return 'tata' end)(meh)
+local function check(s : string) end
+
+local function f(meh : string) : ((value) -> (string))
+   return tostring
 end
 
-function g(meh : string)
-   return f(meh)
-end
+g = f('meh')
 
+check(g)
+
+-- g = function(meh : string)
+--    return 'str' --, f(meh)
+-- end
