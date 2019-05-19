@@ -24,7 +24,8 @@ local Number = tltype.Number()
 local String = tltype.String()
 local Integer = tltype.Integer(false)
 
-local check_block, check_stm, check_exp, check_var, check_var_exps, check_require, check_localrec, check_function
+local check_block, check_stm, check_exp, check_var, check_var_exps
+local check_require, check_localrec, check_function, check_arguments, arglist2type
 
 local acolor = {
   red     = "\27[31;1m",
@@ -460,6 +461,54 @@ function check_require (env, name, pos, extra_path, only_tld)
   return env["loaded"][name]
 end
 
+-- check wether t1 or t2 have a metafield that matches op
+local function check_metatables_for_op(env, t1, t2, op)
+  local function getFieldType(t, name)
+    local ft = tltype.getMetaField(tltype.Literal(name), t)
+    if tltype.isNil(ft) then
+      return nil
+    end
+    return ft
+  end
+
+  local op_meta_field = '__' .. op
+  return getFieldType(t1, op_meta_field) or getFieldType(t2, op_meta_field)
+end
+
+-- check if binary operands have overloaded operators
+local function check_binary_op_overload(env, exp, op)
+  local exp1, exp2 = exp[2], exp[3]
+  check_exp(env, exp1)
+  check_exp(env, exp2)
+  local t1, t2 = tltype.first(get_type(exp1)), tltype.first(get_type(exp2))
+  local meta_field = check_metatables_for_op(env, t1, t2, op)
+
+  if meta_field then
+    local pos = exp1.pos
+    -- the operator is overloaded !
+    if tltype.isFunction(meta_field) then
+      local dec_type = meta_field[1]
+      local infered = arglist2type{exp1, exp2}
+      check_arguments(env,
+                      op,
+                      dec_type,
+                      infered,
+                      pos)
+      set_type(exp, meta_field[2])
+    else
+      typeerror(env, "overload", string.format(
+                  "expected function as operator '%s' overload meta-field but got %s",
+                  op,
+                  tltype.tostring(meta_field)),
+                exp1.pos)
+      set_type(exp, Nil)
+    end
+    return true
+  else
+    return false
+  end
+end
+
 local function check_arith (env, exp, op)
   local exp1, exp2 = exp[2], exp[3]
   check_exp(env, exp1)
@@ -614,8 +663,9 @@ local function check_order (env, exp)
   end
 end
 
+
 local function apply_filters (env, inout, fset, pos)
-  local has_void = false
+ local has_void = false
   for var, filter in pairs(fset) do
     if not var.assigned and not tlst.isupvalue(env, var) then
       local t = get_type(var)
@@ -718,7 +768,9 @@ end
 
 local function check_binary_op (env, exp)
   local op = exp[1]
-  if op == "add" or op == "sub" or
+  if check_binary_op_overload(env, exp, op) then
+    return
+  elseif op == "add" or op == "sub" or
      op == "mul" or op == "idiv" or op == "div" or op == "mod" or
      op == "pow" then
     check_arith(env, exp, op)
@@ -1054,7 +1106,7 @@ local function explist2typegen (explist, limit)
   end
 end
 
-local function arglist2type (explist)
+function arglist2type (explist)
   local len = #explist
   if len == 0 then
     return tltype.Tuple({ Nil }, true)
@@ -1070,7 +1122,7 @@ local function arglist2type (explist)
   end
 end
 
-local function check_arguments (env, func_name, dec_type, infer_type, pos)
+function check_arguments (env, func_name, dec_type, infer_type, pos)
   local bold_token = env.color and acolor.bold .. "'%s'" .. acolor.reset or "'%s'"
   local msg = "attempt to pass " .. bold_token .. " to %s of input type " .. bold_token
   if tltype.subtype(infer_type, dec_type) then
@@ -1181,12 +1233,17 @@ local function check_call (env, exp)
     elseif t[1] == "require" and #explist == 1 and tltype.isStr(get_type(explist[1])) then
       set_type(exp, check_require(env, get_type(explist[1])[1], exp.pos))
       return {}
-    elseif t[1] == "setmetatable" and #explist == 2 and
-        not tltype.isNil(tltype.getField(tltype.Literal("__index"), get_type(explist[2]))) then
-      local _, t2 = get_type(explist[1]), get_type(explist[2])
-      local t3 = tltype.getField(tltype.Literal("__index"), t2)
-      if tltype.isTable(t3) then t3.open = true end
-      set_type(exp, t3)
+    elseif t[1] == "setmetatable" and #explist == 2 then--and
+--        not tltype.isNil(tltype.getField(tltype.Literal("__index"), get_type(explist[2]))) then
+      local t1, t2 = tltype.first(get_type(explist[1])), tltype.first(get_type(explist[2]))
+      --local t3 = tltype.getField(tltype.Literal("__index"), t2)
+      local mt_deduced = tltype.infer_setmetatable_type(t1, t2)
+      mt_deduced.open = true
+      -- typeerror(env, "mt", string.format("type is %s", tltype.tostring(mt_deduced)),exp.pos)
+      --if tltype.isTable(t3) then t3.open = true end
+      --TODO verifiy if this passes tests
+      --set_type(exp, t3)
+      set_type(exp, mt_deduced)
       return {}
     else
       t = t[2]

@@ -503,12 +503,12 @@ end
 
 -- isField : (field) -> (boolean)
 function tltype.isField (f)
-  return f.tag == "TField" and not f.const
+  return f.tag == "TField" and not f.const and not f.meta
 end
 
 -- isConstField : (field) -> (boolean)
 function tltype.isConstField (f)
-  return f.tag == "TField" and f.const
+  return f.tag == "TField" and f.const and not f.meta
 end
 
 function tltype.isMetaField(f)
@@ -535,6 +535,19 @@ function tltype.getField (f, t)
   if tltype.isTable(t) then
     for _, v in ipairs(t) do
       if tltype.consistent_subtype(f, v[1]) then
+        return v[2]
+      end
+    end
+    return tltype.Nil()
+  else
+    return tltype.Nil()
+  end
+end
+
+function tltype.getMetaField(f, t)
+  if tltype.isTable(t) then
+    for _, v in ipairs(t) do
+      if tltype.isMetaField(v) and tltype.consistent_subtype(f, v[1]) then
         return v[2]
       end
     end
@@ -853,7 +866,11 @@ local function subtype_field (env, f1, f2, relation)
            subtype(env, f1[2], f2[2], relation)
   elseif tltype.isConstField(f1) and tltype.isConstField(f2) then
     return subtype(env, f2[1], f1[1], relation) and
-           subtype(env, f1[2], f2[2], relation)
+      subtype(env, f1[2], f2[2], relation)
+  elseif tltype.isMetaField(f1) and tltype.isMetaField(f2) then
+    return subtype(env, f2[1], f1[1], relation) and
+      subtype(env, f1[2], f2[2], relation) and
+      subtype(env, f2[2], f1[2], relation)
   else
     return false
   end
@@ -1655,6 +1672,45 @@ function tltype.infer_params(env, type_params, ptype, given, pos)
   end
   return tltype.Tuple(types)
 end
+
+-- setmetatable output type deduction
+function tltype.infer_setmetatable_type(t, mt)
+  assert(tltype.isTable(t), tltype.isTable(mt))
+
+  local l = {}
+
+  local function addNonMetaFields(t)
+    for _, f in ipairs(t) do
+      if tltype.isField(f) or tltype.isConstField(f) then
+        table.insert(l, f)
+      end
+    end
+  end
+
+  local index = tltype.getField(tltype.Literal("__index"), mt)
+  if tltype.isTable(index) then -- index is a table, add all field
+    addNonMetaFields(index)
+  elseif tltype.isSelf(index) then -- special case, return self
+    return index
+  end
+
+  addNonMetaFields(t, mt)
+
+  for _, f in ipairs(mt) do
+    if tltype.isField(f) or tltype.isConstField(f) then
+      -- transform metatable fields into metafields
+      table.insert(l, tltype.Field(f.const, f[1], f[2], true))
+    end
+  end
+
+  
+
+  local tt = tltype.Table(table.unpack(l))
+  tt.open = t.open
+  tt.unique = t.unique
+  return tt
+end
+
 
 function tltype.typeerror (env, tag, msg, pos)
   local function lineno (s, i)
