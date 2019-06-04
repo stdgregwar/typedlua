@@ -324,11 +324,18 @@ local unpack = unpack or table.unpack
 -- exprLambda : (number, parlist, explist)
 function tlast.exprLambda(pos, parlist, explist)
   local rpos = explist.pos
-  -- TODO give parametric type when params have no type
   -- recreate a function expr :
+
+  local ret_stat
+  if explist.tag == "ExpList" then
+    ret_stat = tlast.statReturn(rpos, unpack(explist))
+  else
+    ret_stat = tlast.statReturn(rpos, explist)
+  end
+
   return tlast.exprFunction(pos, nil, parlist,
                             tlast.block(rpos,
-                                        tlast.statReturn(rpos, unpack(explist))
+                                        ret_stat
                             )
   )
 end

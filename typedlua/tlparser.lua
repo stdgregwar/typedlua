@@ -121,7 +121,9 @@ local G = lpeg.P { "TypedLua";
             lpeg.V("Type"))^-1 / tlast.ident;
   FunctionDef = tllexer.kw("function") * lpeg.V("FuncBody") +
     lpeg.Cp() * tllexer.symb("(") * lpeg.V("ParList") * tllexer.symb(")")
-    * tllexer.symb("->") * lpeg.V("ExpList") / tlast.exprLambda;
+    * tllexer.symb("->") *
+    (tllexer.symb("(") * lpeg.V("ExpList") * tllexer.symb(")") +
+       lpeg.V("Expr")) / tlast.exprLambda;
   FieldSep = tllexer.symb(",") + tllexer.symb(";");
   Field = lpeg.Cp() *
           ((tllexer.symb("[") * lpeg.V("Expr") * tllexer.symb("]")) +

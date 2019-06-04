@@ -39,12 +39,9 @@ pair<{"c":integer}>({c=1, a=1}, {c=1, b=1})
 -- complex inference with intersections and function involved
 fpair({a=1,b='s',d='a'}, a, b, {a=1,b='s',c='a'})
 
-
 higher({c=1, t=true}, (a : {'c':number}) -> {c=a.c,t=false,g="test"})
 
-local fun = (a : {'c':number}) -> {c=a.c,t=false,g="test"}
-
-higherrev(fun, {c=1, t=true})
+higherrev((a : {'c':number}) -> {c=a.c,t=false,g="test"}, {c=1, t=true})
 
 -- define a function to turn U into Option<U>
 local function Some<U>(v : U) : U?
