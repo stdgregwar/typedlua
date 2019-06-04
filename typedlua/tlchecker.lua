@@ -89,7 +89,7 @@ local function check_self (env, torig, t, pos)
   elseif tltype.isTable(t) then
     local l = {}
     for _, v in ipairs(t) do
-      table.insert(l, tltype.Field(v.const, v[1], check_self_field(env, torig, v[2], pos)))
+      table.insert(l, tltype.Field(v.const, v[1], check_self_field(env, torig, v[2], pos), v.meta))
     end
     local r = tltype.Table(unpack(l))
     r.unique = t.unique
@@ -133,7 +133,7 @@ function check_self_field(env, torig, t, pos)
   elseif tltype.isTable(t) then
     local l = {}
     for _, v in ipairs(t) do
-      table.insert(l, tltype.Field(v.const, v[1], check_self_field(env, torig, v[2], pos)))
+      table.insert(l, tltype.Field(v.const, v[1], check_self_field(env, torig, v[2], pos), v.meta))
     end
     local r = tltype.Table(unpack(l))
     r.unique = t.unique
@@ -399,7 +399,7 @@ local function check_tld (env, name, path, pos)
   for _, v in ipairs(ast) do
     local tag = v.tag
     if tag == "Id" then
-      table.insert(t, tltype.Field(v.const, tltype.Literal(v[1]), replace_names(env, v[2], pos)))
+      table.insert(t, tltype.Field(v.const, tltype.Literal(v[1]), replace_names(env, v[2], pos), v.meta))
     elseif tag == "Interface" then
       check_interface(env, v)
     elseif tag == "Require" then
@@ -464,6 +464,9 @@ end
 -- check wether t1 or t2 have a metafield that matches op
 local function check_metatables_for_op(env, t1, t2, op)
   local function getFieldType(t, name)
+    if not tltype.isTable(t) then
+      return nil
+    end
     local ft = tltype.getMetaField(tltype.Literal(name), t)
     if tltype.isNil(ft) then
       return nil
@@ -768,12 +771,10 @@ end
 
 local function check_binary_op (env, exp)
   local op = exp[1]
-  if check_binary_op_overload(env, exp, op) then
-    return
-  elseif op == "add" or op == "sub" or
+  if op == "add" or op == "sub" or
      op == "mul" or op == "idiv" or op == "div" or op == "mod" or
      op == "pow" then
-    check_arith(env, exp, op)
+       return check_binary_op_overload(env, exp, op) or check_arith(env, exp, op)
   elseif op == "concat" then
     check_concat(env, exp)
   elseif op == "eq" then
@@ -968,6 +969,7 @@ local function check_generic_function_def(env, fundef, tself)
   check_function(env, fundef, tself, true)
   tlst.end_scope(env)
   local deduced_type = get_type(fundef)
+  local better = replace_names(env, deduced_type, fundef.pos)
   set_type(fundef, tltype.Generic(param_names,deduced_type))
 end
 
@@ -1055,7 +1057,7 @@ local function check_table (env, exp)
     end
     if t2.open then t2.open = nil end
     t2 = tltype.first(t2)
-    l[k] = tltype.Field(v.const, t1, t2)
+    l[k] = tltype.Field(v.const, t1, t2, v.meta)
   end
   local t = tltype.Table(unpack(l))
   t.unique = true
@@ -1186,9 +1188,10 @@ local function check_generic_local_function_def(env, id, fundef)
 
   -- create a dummy name for the function instance
   check_localrec(env, id, fundef, true)
+  local deduced_type = get_type(id)
   tlst.end_scope(env)
   tlst.set_local(env, id)
-  local deduced_type = get_type(id)
+  
   local t = tltype.Generic(param_names, deduced_type)
   set_type(id, t)
   set_ubound(id, t)
@@ -1980,9 +1983,9 @@ function check_var (env, var, exp)
           if exp then
             local t3 = tltype.general(get_type(exp))
             local t = tltype.general(t1)
-            table.insert(t, tltype.Field(var.const, t2, t3))
+            table.insert(t, tltype.Field(var.const, t2, t3, var.meta))
             if tltype.subtype(t, t1) then
-              table.insert(t1, tltype.Field(var.const, t2, t3))
+              table.insert(t1, tltype.Field(var.const, t2, t3, var.meta))
             else
               msg = "could not include field " .. bold_token
               msg = string.format(msg, tltype.tostring(t2))

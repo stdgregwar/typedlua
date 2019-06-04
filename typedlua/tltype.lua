@@ -534,7 +534,7 @@ end
 function tltype.getField (f, t)
   if tltype.isTable(t) then
     for _, v in ipairs(t) do
-      if tltype.consistent_subtype(f, v[1]) then
+      if not tltype.isMetaField(v) and tltype.consistent_subtype(f, v[1]) then
         return v[2]
       end
     end
@@ -597,8 +597,10 @@ function tltype.checkTypeDec (n, t)
       return true
     elseif t.type_args then
       return true -- if type is parametric, let's handle it later
+    elseif tltype.isFunction(t) then
+      return true
     else
-      return nil, "attempt to name a type that is not a table"
+      return nil, "attempt to name a type that is not a table or function"
     end
   else
     local msg = "attempt to redeclare type '%s'"
@@ -1465,7 +1467,8 @@ local function lowest_upper_bound(env, t1, t2, ignore_literal)
         local k = lowest_upper_bound(env, t1[i][1], t2[j][1], true)
         local v = lowest_upper_bound(env, t1[i][2], t2[j][2])
         if not tltype.isValue(k) then
-          table.insert(int, tltype.Field(t1[i].const or t2[j].const, k, v, t1[i].meta))
+          -- TODO verify meta behaviour here
+          table.insert(int, tltype.Field(t1[i].const or t2[j].const, k, v, t1[i].meta or t2[i].meta))
         end
       end
     end
@@ -1483,14 +1486,19 @@ local function param_subst(t, sub)
   if type(t) ~= 'table' then return t end
   
   if tltype.isParameter(t) then
-    if sub[t.name] then
-      return sub[t.name]
+    if sub[t.id] then
+      return sub[t.id]
     end
   end
 
   for i, st in ipairs(t) do
     t[i] = param_subst(st, sub)
   end
+
+  if tltype.isVariable(t) and t.type_args then --don't forget to replace also in type args
+    param_subst(t.type_args, sub)
+  end
+
   return t
 end
 
@@ -1514,7 +1522,7 @@ function tltype.instanciate_generic(generic, args)
   local subst = {}
   local type_params = generic.type_params
   for i, t in ipairs(args) do
-    subst[type_params[i][1]] = t
+    subst[type_params[i].id] = t
   end
   return param_subst(deepcopy(generic[1]), subst)
 end
@@ -1554,7 +1562,7 @@ function tltype.infer_params(env, type_params, ptype, given, pos)
       end
       return
     end
-    if tltype.isParameter(ptype) then
+    if tltype.isParameter(ptype) and infered_bounds[ptype.id] then
       local id = ptype.id
       local bounds = infered_bounds[id]
       local lower = bounds.l
@@ -1679,19 +1687,21 @@ function tltype.infer_setmetatable_type(t, mt)
 
   local l = {}
 
+  local function has_field(f)
+    for _, v in ipairs(l) do
+      if not tltype.isMetaField(v) and tltype.consistent_subtype(f[1], v[1]) then
+        return true
+      end
+    end
+    return false
+  end
+
   local function addNonMetaFields(t)
     for _, f in ipairs(t) do
-      if tltype.isField(f) or tltype.isConstField(f) then
+      if (tltype.isField(f) or tltype.isConstField(f)) and not has_field(f) then
         table.insert(l, f)
       end
     end
-  end
-
-  local index = tltype.getField(tltype.Literal("__index"), mt)
-  if tltype.isTable(index) then -- index is a table, add all field
-    addNonMetaFields(index)
-  elseif tltype.isSelf(index) then -- special case, return self
-    return index
   end
 
   addNonMetaFields(t, mt)
@@ -1703,6 +1713,12 @@ function tltype.infer_setmetatable_type(t, mt)
     end
   end
 
+  local index = tltype.getField(tltype.Literal("__index"), mt)
+  if tltype.isTable(index) then -- index is a table, add all field
+    addNonMetaFields(index)
+  elseif tltype.isSelf(index) then -- special case, return self
+    return index
+  end
   
 
   local tt = tltype.Table(table.unpack(l))

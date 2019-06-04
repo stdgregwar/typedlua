@@ -12,8 +12,15 @@ interface CoroThread<I,O>
    yield : (O) -> (I)
 end
 
+typealias CoroFun<A,B> = (CoroThread<A,B>, A) -> (B)
+
+-- interface SafeCouroutine
+--    create<I,O> : (CoroFun<I,O>) -> (CoroHandle<I,O>)
+--    wrap<I,O> : (CoroFun<I,O>) -> ((I)->(O))
+--    end
+
 -- create a typed coroutine wrapper, supports only single argument exchanges
-function safe_coroutine.create<I,O>(f : (CoroThread<I,O> ,I) -> (O)) : CoroHandle<I,O>
+function safe_coroutine.create<I,O>(f : CoroFun<I,O>) : CoroHandle<I,O>
     local thread = coroutine.create(f)
     local first = true
     local coro_thread = {
@@ -38,7 +45,7 @@ function safe_coroutine.create<I,O>(f : (CoroThread<I,O> ,I) -> (O)) : CoroHandl
     }
 end
 
-function safe_coroutine.wrap<I,O>(f : (CoroThread<I,O>, I) -> (O)) : ((I) -> (O))
+function safe_coroutine.wrap<I,O>(f : CoroFun<I,O>) : ((I) -> (O))
    local hand = safe_coroutine.create(f)
    return function(i : I)
       local code, data = hand.resume(i)
