@@ -87,7 +87,7 @@ local G = lpeg.P { "TypedLuaDescription";
   IdList = lpeg.Cp() * lpeg.V("TypeDecId") * (tllexer.symb(",") * lpeg.V("TypeDecId"))^0 /
            tlast.namelist;
   IdDec = lpeg.V("IdList") * tllexer.symb(":") *
-          (lpeg.V("Type") + lpeg.V("MethodType")) / tltype.fieldlist;
+          (lpeg.V("TopType") + lpeg.V("MethodType") + lpeg.V("GenericMethodType")) / tltype.fieldlist;
   IdDecList = (lpeg.V("IdDec")^1 + lpeg.Cc(nil)) / tltype.Table;
   TypeParams = lpeg.Cp() * (tllexer.symb("<") * lpeg.V("IdList") * tllexer.symb(">"))^-1 / tlast.typeParList;
   TypeArgs = tllexer.symb("<") * lpeg.V("TupleType") * tllexer.symb(">");
@@ -100,6 +100,7 @@ local G = lpeg.P { "TypedLuaDescription";
     tlast.statInterface;
 
   GenericType = lpeg.V("MandatoryTypeParams") * lpeg.V("Type") / tltype.makeGeneric;
+  GenericMethodType = lpeg.V("MandatoryTypeParams") * lpeg.V("MethodType") / tltype.makeGeneric;
 
   -- parser
   Require = lpeg.Cp() * tllexer.kw("require") * lpeg.V("RequireArgs") / tlast.statRequire;

@@ -1165,6 +1165,8 @@ local function replace_self (env, t, tself)
     return r
   elseif tltype.isFunction(t) then
     return tltype.Function(replace_self(env, t[1], tself), replace_self(env, t[2], tself))
+  elseif tltype.isGeneric(t) then
+    return tltype.Generic(t.type_params, replace_self(env, t[1], tself))
   elseif tltype.isVararg(t) then
     return tltype.Vararg(replace_self(env, t[1], tself))
   else
@@ -1201,6 +1203,12 @@ local function metatable_call_type(env, tpe1, tpe2)
 
 end
 
+local function get_generic_infered_params(env, t, inferred_args, pos)
+  local gfunc = t[1]
+  local gargtuple = gfunc[1]
+  return tltype.infer_params(env, t.type_params, replace_names(env,gargtuple, pos), inferred_args, pos)
+end
+
 local function check_call (env, exp)
   local exp1 = exp[1]
   local explist = {}
@@ -1218,9 +1226,8 @@ local function check_call (env, exp)
   -- if called value is a generic function, try to infer types
   if tltype.isGenericFunction(t) then
     -- try to infer passed types
-    local gfunc = t[1]
-    local gargtuple = gfunc[1]
-    local infered_params = tltype.infer_params(env, t.type_params, replace_names(env,gargtuple,exp1.pos), inferred_type,exp1.pos)
+    local infered_params = get_generic_infered_params(env, t, inferred_type, exp1.pos)
+
     if infered_params then
       t = tltype.instanciate_generic(t, infered_params)
     end
@@ -1277,16 +1284,43 @@ local function check_invoke (env, exp)
   check_exp(env, exp1)
   check_exp(env, exp2)
   check_explist(env, explist)
-  local t1, t2 = get_type(exp1), get_type(exp2)
+  local t1, t2 = tltype.first(get_type(exp1)), get_type(exp2)
   t1 = replace_self(env, t1, env.self)
   table.insert(explist, 1, { type = t1 })
+  t1 = replace_names(env, t1, exp1.pos)
+  t1 = tltype.unfold(t1)
   if tltype.isTable(t1) or
      tltype.isString(t1) or
      tltype.isStr(t1) then
     local inferred_type = replace_self(env, arglist2type(explist), env.self)
+    inferred_type = replace_names(env, inferred_type, exp.pos)
     local t3
     if tltype.isTable(t1) then
-      t3 = replace_self(env, tltype.getField(t2, t1), t1)
+      t3 = tltype.getField(t2, t1)
+      -- trying to specialize template method, BEFORE replacing self, this
+      -- way, self stays not specialized
+      if exp2.type_args and #exp2.type_args > 0 then
+        if not tltype.isGenericFunction(t3) then
+          typeerror(env, "generic",
+                    string.format("trying to instanciate non generic type",
+                                  tltype.tostring(t3)),
+                    exp.pos)
+        end
+        local gt = check_generic_instanciation(env, exp2.type_args, t3, exp2.pos)
+        if gt then
+          t3 = gt
+        end
+      -- else try to infer parameters
+      elseif tltype.isGenericFunction(t3) then
+        -- temporarily replace self
+        local ttmp = replace_self(env, t3, t1)
+        local infered_params = get_generic_infered_params(env, ttmp, inferred_type, exp.pos)
+        if infered_params then
+          t3 = tltype.instanciate_generic(t3, infered_params)
+        end
+      end
+
+      t3 = replace_self(env, t3, t1)
       --local s = env.self or Nil
       --if not tltype.subtype(s, t1) then env.self = t1 end
     else
@@ -1295,6 +1329,7 @@ local function check_invoke (env, exp)
       inferred_type[1] = String
     end
     local msg = "attempt to call method " .. bold_token .. " of type " .. bold_token
+
     if tltype.isFunction(t3) then
       check_arguments(env, "field", t3[1], inferred_type, exp.pos)
       set_type(exp, t3[2])
@@ -1870,7 +1905,6 @@ local function check_index (env, exp)
     -- if type is generic and we have arguments, try to instanciate
     if tltype.isGeneric(field_type) then
       if exp2.type_args then
-        print("type args")
         local gt = check_generic_instanciation(env, exp2.type_args, field_type, exp2.pos)
         if gt then
           field_type = gt

@@ -14,11 +14,6 @@ end
 
 typealias CoroFun<A,B> = (CoroThread<A,B>, A) -> (B)
 
--- interface SafeCouroutine
---    create<I,O> : (CoroFun<I,O>) -> (CoroHandle<I,O>)
---    wrap<I,O> : (CoroFun<I,O>) -> ((I)->(O))
---    end
-
 -- create a typed coroutine wrapper, supports only single argument exchanges
 function safe_coroutine.create<I,O>(f : CoroFun<I,O>) : CoroHandle<I,O>
     local thread = coroutine.create(f)

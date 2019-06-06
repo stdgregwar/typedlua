@@ -1,0 +1,62 @@
+--- Description files for luaiter library
+
+interface Iter<U>
+  map : <V>((U) -> (V)) => (Iter<V>)
+  flatmap : <V>((U)->(Iter<V>)) => (Iter<V>)
+
+  take : (number) => (Iter<U>)
+  drop : (number) => (Iter<U>)
+
+  takewhile : ((U)->(boolean)) => (Iter<U>)
+  dropwhile : ((U)->(boolean)) => (Iter<U>)
+  filter : ((U)->(boolean)) => (Iter<U>)
+  filterout : ((U)->(boolean)) => (Iter<U>)
+
+  foreach : ((U)->()) => ()
+  each : ((U)->()) => ()
+  reduce : ((U,U)->(U)) => (U)
+  collect : ({U}) => (Iter<U>)
+  concat : (string) => (string)
+  count : () => (number)
+  isempty : () => (boolean)
+
+  all : ((U)->(boolean)) => (boolean)
+  any : ((U)->(boolean)) => (boolean)
+end
+
+-- constructors
+iter : <U>(()->(U?)) -> (Iter<U>)
+array : <U>({U})->(Iter<U>)
+dup : <U>(U)->(Iter<U>)
+zeros : ()->(Iter<number>)
+ones : ()->(Iter<number>)
+range : (number, number?, number?) -> (Iter<number>)
+rand : (number?, number?) -> (Iter<number>)
+str : (string) -> (Iter<string>)
+
+-- slicing
+take : <U>(number, Iter<U>) -> (Iter<U>)
+drop : <U>(number, Iter<U>) -> (Iter<U>)
+slice : <U>(number, number, Iter<U>) -> (Iter<U>)
+
+-- transforms
+map : <U,V>((U)->(V), Iter<U>) -> (Iter<V>)
+flatmap : <U, V>((U)->(Iter<V>), Iter<U>) -> (Iter<V>)
+-- scan
+--group : <U>()
+
+-- filtering
+takewhile : <U>((U)->(boolean), Iter<U>)->(Iter<U>)
+dropwhile : <U>((U)->(boolean), Iter<U>)->(Iter<U>)
+filter : <U>((U)->(boolean), Iter<U>)->(Iter<U>)
+filterout : <U>((U)->(boolean), Iter<U>)->(Iter<U>)
+
+--reducing
+each : <U>((U)->(), Iter<U>) -> ()
+reduce : <U>((U,U)->(U), Iter<U>) -> (U)
+collect : <U>({U}, Iter<U>) -> ({U})
+concat : <U>(string, Iter<U>) -> (string)
+count : <U>(Iter<U>) -> (number)
+isempty : <U>(Iter<U>) -> (boolean)
+all : <U>((U)->(boolean), Iter<U>)-> (boolean)
+any : <U>((U)->(boolean), Iter<U>)-> (boolean)
