@@ -1166,7 +1166,9 @@ local function replace_self (env, t, tself)
   elseif tltype.isFunction(t) then
     return tltype.Function(replace_self(env, t[1], tself), replace_self(env, t[2], tself))
   elseif tltype.isGeneric(t) then
-    return tltype.Generic(t.type_params, replace_self(env, t[1], tself))
+    local r = tltype.Generic(t.type_params, replace_self(env, t[1], tself))
+    r.name = t.name
+    return r
   elseif tltype.isVararg(t) then
     return tltype.Vararg(replace_self(env, t[1], tself))
   else

@@ -12,8 +12,8 @@ interface Iter<U>
   filter : ((U)->(boolean)) => (Iter<U>)
   filterout : ((U)->(boolean)) => (Iter<U>)
 
-  foreach : ((U)->()) => ()
-  each : ((U)->()) => ()
+  foreach : ((U)->(value*)) => ()
+  each : ((U)->(value*)) => ()
   reduce : ((U,U)->(U)) => (U)
   collect : ({U}) => (Iter<U>)
   concat : (string) => (string)

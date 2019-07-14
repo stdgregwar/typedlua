@@ -688,6 +688,7 @@ local function unfold_recursive (tr, t)
       table.insert(l, tltype.Field(v.const, v[1], unfold_recursive(tr, v[2]), v.meta))
     end
     local r = tltype.Table(table.unpack(l))
+    r.name = t.name or tr.name
     r.unique = t.unique
     r.open = t.open
     return r
@@ -1524,7 +1525,9 @@ function tltype.instanciate_generic(generic, args)
   for i, t in ipairs(args) do
     subst[type_params[i].id] = t
   end
-  return param_subst(deepcopy(generic[1]), subst)
+  local result = param_subst(deepcopy(generic[1]), subst)
+  result.name = generic.name
+  return result
 end
 
 -- type inference
@@ -1599,9 +1602,9 @@ function tltype.infer_params(env, type_params, ptype, given, pos)
                          "cannot concile type bound [%s <: %s <: %s] and %s (relation : '%s')",
                          type2str(lower), ptype.name, type2str(upper), type2str(given), relation), pos)
       failed = true
-    elseif relation == '<:' and subtype(env, ptype, given) then
+    elseif relation == ':>' and subtype(env, ptype, given) then
       return
-    elseif relation == ':>' and subtype(env, given, ptype) then
+    elseif relation == '<:' and subtype(env, given, ptype) then
       return
     elseif relation == '=' and subtype(env, given, ptype) and subtype(env, ptype, given) then
       return
